@@ -1,7 +1,5 @@
 import jwt from "jsonwebtoken";
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import prisma from "../lib/prisma.js";
 
 export const protect = async (req, res, next) => {
   let token;
@@ -17,11 +15,23 @@ export const protect = async (req, res, next) => {
 
     req.user = await prisma.user.findUnique({
       where: { id: decoded.id },
-      select: { id: true, email: true, name: true },
+      select: { id: true, email: true, name: true, role: true },
     });
+
+    if (!req.user)
+      return res.status(401).json({message: "User no longer exists"})
 
     next();
   } catch (error) {
     res.status(401).json({ message: "Token failed" });
   }
+};
+
+export const restrictTo = (...roles) => {
+  return (req, res, next) => {
+    if (!roles.includes(req.user.role)) {
+      return res.status(403).json({ message: "You do not have permission" });
+    }
+    next();
+  };
 };

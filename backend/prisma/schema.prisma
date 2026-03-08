@@ -13,34 +13,295 @@ datasource db {
   provider = "postgresql"
 }
 
+enum Role {
+  USER
+  EXPERT
+  ADMIN
+}
+
+enum Goal {
+  LOSE_WEIGHT
+  MAINTAIN
+  BUILD_MUSCLE
+  EAT_HEALTHIER
+}
+
+enum Difficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+enum MealType {
+  BREAKFAST
+  LUNCH
+  DINNER
+  SNACK
+}
+
+
+
 model User {
   id        Int      @id @default(autoincrement())
   name      String
   email     String   @unique
   password  String
+  role      Role     @default(USER)
+  bio       String?
+  avatarURL String?
+  specialisation String?
+  // nutrition preferences
+  calorieTarget Int?
+  goal      Goal?
+  restrictions String[]
+
   createdAt DateTime @default(now())
+  updateAt  DateTime @updatedAt
+ 
   recipes   Recipe[]
-  posts     FeedPost[]
+  likes     Like[]
+  saves     Save[]
+  comments  Comment[]
+  followers Follow[] @relation("following")
+  following Follow[] @relation("follower")
+  mealPlans MealPlan[]
+  mealLogs  MealLog[]
+  ownedCommunities Community[]
+  communities CommunityMember[]
+
+  @@map("users")
 }
 
+//------Recipes------
 model Recipe {
   id          Int      @id @default(autoincrement())
   title       String
   description String
-  image       String?
-  ingredients String[]
-  steps       String[]
-  user        User     @relation(fields: [userId], references: [id])
+  imageURL    String?
+  prepTime    Int?
+  cookTime    Int?
+  difficulty  Difficulty @default(EASY)
+  cuisine     String?
+  isPublished Boolean  @default(true)
+
   userId      Int
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt   DateTime @default(now())
+  updateAt    DateTime @updatedAt
+
+  ingredients RecipeIngredient[]
+  steps       RecipeStep[]
+  tags        RecipeTag[]
+  likes       Like[]
+  saves       Save[]
+  comments    Comment[]
+
+  @@map("recipes")
 }
 
-model FeedPost {
+model RecipeIngredient {
+  id           Int        @id @default(autoincrement())
+  recipeId     Int
+  recipe       Recipe     @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  ingredientId Int
+  ingredient   Ingredient @relation(fields: [ingredientId], references: [id])
+  quantity     Float
+  unit         String    
+
+  @@map("recipe_ingredients")
+}
+
+model RecipeStep {
+  id         Int    @id @default(autoincrement())
+  recipeId   Int
+  recipe     Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  stepNumber Int
+  instruction String
+
+  @@map("recipe_steps")
+}
+
+model RecipeTag {
+  id       Int    @id @default(autoincrement())
+  recipeId Int
+  recipe   Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  tag      String 
+
+  @@map("recipe_tags")
+}
+
+//------Ingredients------
+
+model Ingredient {
+  id              Int     @id @default(autoincrement())
+  name            String  @unique
+  usdaFdcId       Int?    
+  caloriesPer100g Float?
+  proteinPer100g  Float?
+  carbsPer100g    Float?
+  fatPer100g      Float?
+
+  // Relations
+  recipeIngredients RecipeIngredient[]
+  mealIngredients   MealIngredient[]
+
+  @@map("ingredients")
+}
+
+
+//------Social------
+
+model Like {
   id        Int      @id @default(autoincrement())
-  image     String
-  caption   String?
-  user      User     @relation(fields: [userId], references: [id])
   userId    Int
-  likes     Int      @default(0)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recipeId  Int
+  recipe    Recipe   @relation(fields: [recipeId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
+
+  @@unique([userId, recipeId]) 
+  @@map("likes")
+}
+
+model Save {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recipeId  Int
+  recipe    Recipe   @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, recipeId])
+  @@map("saves")
+}
+
+model Comment {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  recipeId  Int
+  recipe    Recipe   @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  content   String
+  createdAt DateTime @default(now())
+
+  @@map("comments")
+}
+
+model Follow {
+  id          Int      @id @default(autoincrement())
+  followerId  Int
+  follower    User     @relation("follower", fields: [followerId], references: [id], onDelete: Cascade)
+  followingId Int
+  following   User     @relation("following", fields: [followingId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  @@unique([followerId, followingId]) 
+  @@map("follows")
+}
+
+
+//------Communities------
+
+model Community {
+  id          Int      @id @default(autoincrement())
+  name        String
+  description String?
+  imageUrl    String?
+  creatorId   Int
+  creator     User     @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  members     CommunityMember[]
+
+  @@map("communities")  
+}
+
+model CommunityMember {
+  id          Int       @id @default(autoincrement())
+  communityId Int
+  community   Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  userId      Int
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  joinedAt    DateTime  @default(now())
+
+  @@unique([communityId, userId]) 
+  @@map("community_members")
+}
+
+
+//------Meal Planing------
+
+model MealPlan {
+  id            Int      @id @default(autoincrement())
+  userId        Int
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  goal          String   
+  calorieTarget Int
+  restrictions  String[]
+  rawInput      String   // original user natural language input
+  createdAt     DateTime @default(now())
+
+  meals         Meal[]
+
+  @@map("meal_plans")
+}
+
+model Meal {
+  id           Int      @id @default(autoincrement())
+  mealPlanId   Int
+  mealPlan     MealPlan @relation(fields: [mealPlanId], references: [id], onDelete: Cascade)
+  dayNumber    Int      
+  mealType     MealType
+  name         String
+
+  // USDA-validated totals 
+  totalCalories Float   @default(0)
+  totalProteinG Float   @default(0)
+  totalCarbsG   Float   @default(0)
+  totalFatG     Float   @default(0)
+
+  // LLM estimates stored separately for evaluation chapter
+  llmCalories   Float?
+  llmProteinG   Float?
+  llmCarbsG     Float?
+  llmFatG       Float?
+
+  ingredients   MealIngredient[]
+  logs          MealLog[]
+
+  @@map("meals")
+}
+
+model MealIngredient {
+  id           Int        @id @default(autoincrement())
+  mealId       Int
+  meal         Meal       @relation(fields: [mealId], references: [id], onDelete: Cascade)
+  ingredientId Int
+  ingredient   Ingredient @relation(fields: [ingredientId], references: [id])
+  quantity     Float
+  unit         String
+
+  usdaCalories Float?
+  usdaProteinG Float?
+  usdaCarbsG   Float?
+  usdaFatG     Float?
+
+  @@map("meal_ingredients")
+}
+
+model MealLog {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mealId    Int
+  meal      Meal     @relation(fields: [mealId], references: [id], onDelete: Cascade)
+  loggedAt  DateTime @default(now())
+
+  // Snapshot of nutrition at time of logging
+  calories  Float
+  proteinG  Float
+  carbsG    Float
+  fatG      Float
+
+  @@map("meal_logs")
 }
