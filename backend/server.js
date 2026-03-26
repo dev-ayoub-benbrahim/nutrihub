@@ -2,6 +2,8 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import authRoutes from "./routes/auth.routes.js";
+import socialRoutes from "./routes/Social.routes.js"
+import recipeRoutes  from "./routes/Recipe.routes.js"
 import rateLimit from "express-rate-limit"
 dotenv.config();
 
@@ -23,6 +25,8 @@ app.use(limiter);
 
 // Routes
 app.use("/api/auth", authRoutes)
+app.use("/api/recipes", recipeRoutes);
+app.use("/api/social", socialRoutes)
 
 app.get("/", (req, res) => {
   res.json({ message: "NutriHub API is running" });
