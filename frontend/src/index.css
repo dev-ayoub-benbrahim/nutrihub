@@ -1,1 +1,56 @@
+
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,600;0,9..144,700;1,9..144,300;1,9..144,400&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap');
+
 @import "tailwindcss";
+
+@theme {
+  --color-forest:   #0F1A12;
+  --color-forest2:  #1A2B1E;
+  --color-forest3:  #243D28;
+  --color-sage:     #4A7C59;
+  --color-sage-l:   #6A9E78;
+  --color-rust:     #C4622D;
+  --color-rust-l:   #E07845;
+  --color-gold:     #D4A843;
+  --color-gold-l:   #F0C96A;
+  --color-cream:    #F7F3EC;
+  --color-cream2:   #EDE8DF;
+  --color-muted:    #8FA897;
+  --font-serif:     'Fraunces', Georgia, serif;
+  --font-sans:      'DM Sans', system-ui, sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  background-color: #0F1A12;
+  color: #F7F3EC;
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+#root { height: 100%; }
+
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #0F1A12; }
+::-webkit-scrollbar-thumb { background: #243D28; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #4A7C59; }
+
+/* font helpers */
+.font-serif { font-family: 'Fraunces', Georgia, serif !important; }
+
+/* animations */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.anim-up   { animation: fadeUp 0.35s ease both; }
+.anim-up-1 { animation: fadeUp 0.35s 0.07s ease both; }
+.anim-up-2 { animation: fadeUp 0.35s 0.14s ease both; }
+.anim-up-3 { animation: fadeUp 0.35s 0.21s ease both; }
+.anim-in   { animation: fadeIn 0.3s ease both; }
