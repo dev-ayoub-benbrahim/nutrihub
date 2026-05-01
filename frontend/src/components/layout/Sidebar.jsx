@@ -2,22 +2,34 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { getInitials } from '../../utils/helpers';
 
+// ── Icons — all defined BEFORE the NAV array ──────────────────
 
-const CompassIcon = () => (
+const ExploreIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
     <circle cx="12" cy="12" r="10"/>
     <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/>
   </svg>
 );
 
-const BrainIcon = () => (
+const PlannerIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
     <path d="M9.5 2A2.5 2.5 0 017 4.5A2.5 2.5 0 014.5 7H4a2 2 0 00-2 2 2 2 0 002 2h.5A2.5 2.5 0 017 13.5V14a2 2 0 002 2m3.5-14A2.5 2.5 0 0115 4.5 2.5 2.5 0 0117.5 7H18a2 2 0 012 2 2 2 0 01-2 2h-.5A2.5 2.5 0 0115 13.5V14a2 2 0 01-2 2"/>
     <path d="M9 16v2a2 2 0 002 2h2a2 2 0 002-2v-2"/>
   </svg>
 );
 
-const UsersIcon = () => (
+// Communities = building/grid icon — distinct from people
+const CommunitiesIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="3" width="7" height="7" rx="1"/>
+    <rect x="14" y="3" width="7" height="7" rx="1"/>
+    <rect x="3" y="14" width="7" height="7" rx="1"/>
+    <rect x="14" y="14" width="7" height="7" rx="1"/>
+  </svg>
+);
+
+// People = person silhouette — distinct from communities grid
+const PeopleIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
     <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
     <circle cx="9" cy="7" r="4"/>
@@ -47,15 +59,23 @@ const LogoutIcon = () => (
   </svg>
 );
 
+const AdminIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+  </svg>
+);
 
+// ── NAV defined after icons ────────────────────────────────────
 const NAV = [
-  { path: '/',             label: 'Explore',      icon: <CompassIcon /> },
-  { path: '/meal-planner', label: 'Meal Planner', icon: <BrainIcon />   },
-  { path: '/communities',  label: 'Communities',  icon: <UsersIcon />   },
-  { path: '/saved',        label: 'Saved',        icon: <BookmarkIcon />},
-  { path: '/profile',      label: 'My Profile',   icon: <UserIcon />    },
+  { path: '/',             label: 'Explore',      icon: <ExploreIcon />     },
+  { path: '/meal-planner', label: 'Meal Planner', icon: <PlannerIcon />     },
+  { path: '/communities',  label: 'Communities',  icon: <CommunitiesIcon /> },
+  { path: '/people',       label: 'People',       icon: <PeopleIcon />      },
+  { path: '/saved',        label: 'Saved',        icon: <BookmarkIcon />    },
+  { path: '/profile',      label: 'My Profile',   icon: <UserIcon />        },
 ];
 
+// ─────────────────────────────────────────────────────────────────
 
 export default function Sidebar() {
   const navigate         = useNavigate();
@@ -102,7 +122,26 @@ export default function Sidebar() {
         })}
       </div>
 
-      {/* User card at bottom */}
+      {/* Admin link — only shown to admins */}
+      {user?.role === 'ADMIN' && (
+        <button
+          onClick={() => navigate('/admin')}
+          className={[
+            'w-full flex items-center gap-3 px-5 py-[9px] text-[14px]',
+            'border-l-2 transition-all duration-200 text-left mb-1',
+            location.pathname === '/admin'
+              ? 'border-l-rust bg-[rgba(196,98,45,0.12)] text-cream font-medium'
+              : 'border-l-transparent text-muted hover:text-cream hover:bg-[rgba(74,124,89,0.07)]',
+          ].join(' ')}
+        >
+          <span className={`w-[18px] h-[18px] flex-shrink-0 ${location.pathname === '/admin' ? 'text-rust-l' : ''}`}>
+            <AdminIcon/>
+          </span>
+          Admin Panel
+        </button>
+      )}
+
+      {/* User card */}
       <div className="mt-auto pt-4 px-4 border-t border-[rgba(74,124,89,0.18)]">
         <div
           className="flex items-center gap-2.5 p-2.5 rounded-xl
@@ -113,13 +152,14 @@ export default function Sidebar() {
           <div className="w-8 h-8 rounded-full flex-shrink-0
                           bg-gradient-to-br from-sage to-rust
                           flex items-center justify-center
-                          text-cream text-[12px] font-bold">
-            {user ? getInitials(user.name) : '?'}
+                          text-cream text-[12px] font-bold overflow-hidden">
+            {user?.avatarURL
+              ? <img src={user.avatarURL} alt={user.name} className="w-full h-full object-cover"/>
+              : getInitials(user?.name || '?')
+            }
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-[13px] font-medium text-cream truncate">
-              {user?.name || 'User'}
-            </p>
+            <p className="text-[13px] font-medium text-cream truncate">{user?.name || 'User'}</p>
             <p className="text-[11px] text-muted">{user?.role || 'USER'}</p>
           </div>
           <button
@@ -128,7 +168,7 @@ export default function Sidebar() {
                        duration-200 opacity-0 group-hover:opacity-100"
             title="Sign out"
           >
-            <LogoutIcon />
+            <LogoutIcon/>
           </button>
         </div>
       </div>

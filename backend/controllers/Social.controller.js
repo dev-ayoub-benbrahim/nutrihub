@@ -1,4 +1,5 @@
 import prisma from "../lib/prisma.js";
+import { createNotification } from "./notification.controller.js";
 
 export const likeRecipe = async (req, res) => {
   const recipeId = parseInt(req.params.id);
@@ -12,6 +13,18 @@ export const likeRecipe = async (req, res) => {
     });
 
     const likeCount = await prisma.like.count({ where: { recipeId } });
+
+    // Notify recipe owner (unless they liked their own recipe)
+    if (recipe.userId !== req.user.id) {
+      const liker = await prisma.user.findUnique({ where: { id: req.user.id }, select: { name: true } });
+      await createNotification(prisma, {
+        userId:  recipe.userId,
+        type:    "like",
+        message: `${liker.name} liked your recipe "${recipe.title}"`,
+        link:    `/recipes/${recipeId}`,
+      });
+    }
+
     res.status(201).json({ message: "Recipe liked", likeCount });
   } catch (error) {
     if (error.code === "P2002") {
@@ -144,6 +157,16 @@ export const addComment = async (req, res) => {
     },
   });
 
+  // Notify recipe owner (unless they commented on their own)
+  if (recipe.userId !== req.user.id) {
+    await createNotification(prisma, {
+      userId:  recipe.userId,
+      type:    "comment",
+      message: `${req.user.name} commented on your recipe "${recipe.title}"`,
+      link:    `/recipes/${recipeId}`,
+    });
+  }
+
   res.status(201).json({ message: "Comment posted", comment });
 };
 
@@ -182,6 +205,14 @@ export const followUser = async (req, res) => {
   try {
     await prisma.follow.create({
       data: { followerId, followingId },
+    });
+
+    // Notify the followed user
+    await createNotification(prisma, {
+      userId:  followingId,
+      type:    "follow",
+      message: `${req.user.name} started following you`,
+      link:    `/users/${req.user.id}`,
     });
 
     res.status(201).json({ message: `You are now following ${userToFollow.name}` });
@@ -237,7 +268,7 @@ export const getFollowing = async (req, res) => {
       following: {
         select: { id: true, name: true, avatarURL: true, bio: true },
       },
-      createdAt: true, 
+      createdAt: true,
     },
     orderBy: { createdAt: "desc" },
   });

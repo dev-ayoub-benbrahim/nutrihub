@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
   output   = "../generated/prisma"
@@ -11,6 +5,7 @@ generator client {
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 enum Role {
@@ -39,42 +34,45 @@ enum MealType {
   SNACK
 }
 
-
-
 model User {
-  id        Int      @id @default(autoincrement())
-  name      String
-  email     String   @unique
-  password  String
-  role      Role     @default(USER)
-  bio       String?
-  avatarURL String?
+  id             Int      @id @default(autoincrement())
+  name           String
+  email          String   @unique
+  password       String
+  role           Role     @default(USER)
+  bio            String?
+  avatarURL      String?
   specialisation String?
-  // nutrition preferences
-  calorieTarget Int?
-  goal      Goal?
-  restrictions String[]
+  calorieTarget  Int?
+  goal           Goal?
+  restrictions   String[]
+  createdAt      DateTime @default(now())
+  updateAt       DateTime @updatedAt
 
-  createdAt DateTime @default(now())
-  updateAt  DateTime @updatedAt
- 
-  recipes   Recipe[]
-  likes     Like[]
-  saves     Save[]
-  comments  Comment[]
-  followers Follow[] @relation("following")
-  following Follow[] @relation("follower")
-  mealPlans MealPlan[]
-  mealLogs  MealLog[]
-  ownedCommunities Community[]
-  communities CommunityMember[]
+  recipes           Recipe[]
+  likes             Like[]
+  saves             Save[]
+  comments          Comment[]
+  followers         Follow[]           @relation("following")
+  following         Follow[]           @relation("follower")
+  mealPlans         MealPlan[]
+  mealLogs          MealLog[]
+  ownedCommunities  Community[]
+  communities       CommunityMember[]
+  communityRecipes  CommunityRecipe[]
+  communityPosts    CommunityPost[]
+  notifications     Notification[]  @relation("notifications")
+  reportsMade       Report[]        @relation("reports_made")
+  expertRequests    ExpertRequest[] @relation("expertRequests")
+  postComments      CommunityPostComment[] @relation("postComments")
 
   @@map("users")
 }
 
-//------Recipes------
+// ── Recipes ───────────────────────────────────────────────────
+
 model Recipe {
-  id          Int      @id @default(autoincrement())
+  id          Int        @id @default(autoincrement())
   title       String
   description String
   imageURL    String?
@@ -82,19 +80,25 @@ model Recipe {
   cookTime    Int?
   difficulty  Difficulty @default(EASY)
   cuisine     String?
-  isPublished Boolean  @default(true)
-
+  isPublished Boolean    @default(true)
+  // Optional user-provided nutrition estimates per serving
+  // USDA ingredient data takes precedence when available
+  caloriesPerServing Float?
+  proteinPerServing  Float?
+  carbsPerServing    Float?
+  fatPerServing      Float?
   userId      Int
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt   DateTime @default(now())
-  updateAt    DateTime @updatedAt
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime   @default(now())
+  updateAt    DateTime   @updatedAt
 
-  ingredients RecipeIngredient[]
-  steps       RecipeStep[]
-  tags        RecipeTag[]
-  likes       Like[]
-  saves       Save[]
-  comments    Comment[]
+  ingredients      RecipeIngredient[]
+  steps            RecipeStep[]
+  tags             RecipeTag[]
+  likes            Like[]
+  saves            Save[]
+  comments         Comment[]
+  communityRecipes CommunityRecipe[]
 
   @@map("recipes")
 }
@@ -106,16 +110,16 @@ model RecipeIngredient {
   ingredientId Int
   ingredient   Ingredient @relation(fields: [ingredientId], references: [id])
   quantity     Float
-  unit         String    
+  unit         String
 
   @@map("recipe_ingredients")
 }
 
 model RecipeStep {
-  id         Int    @id @default(autoincrement())
-  recipeId   Int
-  recipe     Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
-  stepNumber Int
+  id          Int    @id @default(autoincrement())
+  recipeId    Int
+  recipe      Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  stepNumber  Int
   instruction String
 
   @@map("recipe_steps")
@@ -125,31 +129,29 @@ model RecipeTag {
   id       Int    @id @default(autoincrement())
   recipeId Int
   recipe   Recipe @relation(fields: [recipeId], references: [id], onDelete: Cascade)
-  tag      String 
+  tag      String
 
   @@map("recipe_tags")
 }
 
-//------Ingredients------
+// ── Ingredients ───────────────────────────────────────────────
 
 model Ingredient {
   id              Int     @id @default(autoincrement())
   name            String  @unique
-  usdaFdcId       Int?    
+  usdaFdcId       Int?
   caloriesPer100g Float?
   proteinPer100g  Float?
   carbsPer100g    Float?
   fatPer100g      Float?
 
-  // Relations
   recipeIngredients RecipeIngredient[]
   mealIngredients   MealIngredient[]
 
   @@map("ingredients")
 }
 
-
-//------Social------
+// ── Social ────────────────────────────────────────────────────
 
 model Like {
   id        Int      @id @default(autoincrement())
@@ -159,7 +161,7 @@ model Like {
   recipe    Recipe   @relation(fields: [recipeId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
 
-  @@unique([userId, recipeId]) 
+  @@unique([userId, recipeId])
   @@map("likes")
 }
 
@@ -190,17 +192,16 @@ model Comment {
 model Follow {
   id          Int      @id @default(autoincrement())
   followerId  Int
-  follower    User     @relation("follower", fields: [followerId], references: [id], onDelete: Cascade)
+  follower    User     @relation("follower",  fields: [followerId],  references: [id], onDelete: Cascade)
   followingId Int
   following   User     @relation("following", fields: [followingId], references: [id], onDelete: Cascade)
   createdAt   DateTime @default(now())
 
-  @@unique([followerId, followingId]) 
+  @@unique([followerId, followingId])
   @@map("follows")
 }
 
-
-//------Communities------
+// ── Communities ───────────────────────────────────────────────
 
 model Community {
   id          Int      @id @default(autoincrement())
@@ -211,9 +212,12 @@ model Community {
   creator     User     @relation(fields: [creatorId], references: [id], onDelete: Cascade)
   createdAt   DateTime @default(now())
 
-  members     CommunityMember[]
+  members         CommunityMember[]
+  communityRecipes CommunityRecipe[]
+  posts           CommunityPost[]
+  // communityPostComments accessed via posts
 
-  @@map("communities")  
+  @@map("communities")
 }
 
 model CommunityMember {
@@ -224,50 +228,94 @@ model CommunityMember {
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   joinedAt    DateTime  @default(now())
 
-  @@unique([communityId, userId]) 
+  @@unique([communityId, userId])
   @@map("community_members")
 }
 
+// Members share recipes into the community feed.
+// @@unique prevents the same recipe being posted to the same community twice.
+model CommunityRecipe {
+  id          Int       @id @default(autoincrement())
+  communityId Int
+  community   Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  recipeId    Int
+  recipe      Recipe    @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  postedById  Int
+  postedBy    User      @relation(fields: [postedById], references: [id], onDelete: Cascade)
+  postedAt    DateTime  @default(now())
 
-//------Meal Planing------
+  @@unique([communityId, recipeId])
+  @@map("community_recipes")
+}
+
+// Text posts for questions, tips, and discussion within a community.
+model CommunityPost {
+  id          Int       @id @default(autoincrement())
+  communityId Int
+  community   Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  userId      Int
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  content     String
+  imageURL    String?    // optional photo
+  postType    String     @default("question")  // question | log | draft
+  ingredients Json?      // only for draft type: [{name,quantity,unit}]
+  createdAt   DateTime   @default(now())
+
+  comments    CommunityPostComment[]
+
+  @@map("community_posts")
+}
+
+// Replies on community wall posts
+model CommunityPostComment {
+  id        Int           @id @default(autoincrement())
+  postId    Int
+  post      CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId    Int
+  user      User          @relation("postComments", fields: [userId], references: [id], onDelete: Cascade)
+  content   String
+  createdAt DateTime      @default(now())
+
+  @@map("community_post_comments")
+}
+
+// ── Meal Planning ─────────────────────────────────────────────
 
 model MealPlan {
   id            Int      @id @default(autoincrement())
   userId        Int
   user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  goal          String   
+  goal          String
   calorieTarget Int
   restrictions  String[]
-  rawInput      String   // original user natural language input
+  rawInput      String
   createdAt     DateTime @default(now())
 
-  meals         Meal[]
+  meals Meal[]
 
   @@map("meal_plans")
 }
 
 model Meal {
-  id           Int      @id @default(autoincrement())
-  mealPlanId   Int
-  mealPlan     MealPlan @relation(fields: [mealPlanId], references: [id], onDelete: Cascade)
-  dayNumber    Int      
-  mealType     MealType
-  name         String
+  id         Int      @id @default(autoincrement())
+  mealPlanId Int
+  mealPlan   MealPlan @relation(fields: [mealPlanId], references: [id], onDelete: Cascade)
+  dayNumber  Int
+  mealType   MealType
+  name       String
 
-  // USDA-validated totals 
-  totalCalories Float   @default(0)
-  totalProteinG Float   @default(0)
-  totalCarbsG   Float   @default(0)
-  totalFatG     Float   @default(0)
+  totalCalories Float @default(0)
+  totalProteinG Float @default(0)
+  totalCarbsG   Float @default(0)
+  totalFatG     Float @default(0)
 
-  // LLM estimates stored separately for evaluation chapter
-  llmCalories   Float?
-  llmProteinG   Float?
-  llmCarbsG     Float?
-  llmFatG       Float?
+  llmCalories Float?
+  llmProteinG Float?
+  llmCarbsG   Float?
+  llmFatG     Float?
 
-  ingredients   MealIngredient[]
-  logs          MealLog[]
+  ingredients MealIngredient[]
+  logs        MealLog[]
 
   @@map("meals")
 }
@@ -280,7 +328,6 @@ model MealIngredient {
   ingredient   Ingredient @relation(fields: [ingredientId], references: [id])
   quantity     Float
   unit         String
-
   usdaCalories Float?
   usdaProteinG Float?
   usdaCarbsG   Float?
@@ -290,18 +337,64 @@ model MealIngredient {
 }
 
 model MealLog {
-  id        Int      @id @default(autoincrement())
-  userId    Int
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  mealId    Int
-  meal      Meal     @relation(fields: [mealId], references: [id], onDelete: Cascade)
-  loggedAt  DateTime @default(now())
-
-  // Snapshot of nutrition at time of logging
-  calories  Float
-  proteinG  Float
-  carbsG    Float
-  fatG      Float
+  id       Int      @id @default(autoincrement())
+  userId   Int
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mealId   Int
+  meal     Meal     @relation(fields: [mealId], references: [id], onDelete: Cascade)
+  loggedAt DateTime @default(now())
+  calories Float
+  proteinG Float
+  carbsG   Float
+  fatG     Float
 
   @@map("meal_logs")
+}
+
+// ── Notifications ─────────────────────────────────────────────
+
+model Notification {
+  id        Int      @id @default(autoincrement())
+  userId    Int                                    // recipient
+  user      User     @relation("notifications", fields: [userId], references: [id], onDelete: Cascade)
+  type      String   // like | comment | follow | community_join | recipe_shared
+  message   String
+  link      String?  // frontend URL to navigate to when tapped
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@map("notifications")
+}
+
+// ── Reports ───────────────────────────────────────────────────
+
+model Report {
+  id             Int      @id @default(autoincrement())
+  reporterId     Int
+  reporter       User     @relation("reports_made", fields: [reporterId], references: [id], onDelete: Cascade)
+  category       String   @default("Other")  // Spam | Inappropriate | Misinformation | Harassment | Other
+  reason         String
+  recipeId       Int?
+  reportedUserId Int?
+  resolved       Boolean  @default(false)
+  resolvedNote   String?
+  createdAt      DateTime @default(now())
+
+  @@map("reports")
+}
+
+// Dedicated expert verification requests — separate from reports
+model ExpertRequest {
+  id             Int      @id @default(autoincrement())
+  userId         Int
+  user           User     @relation("expertRequests", fields: [userId], references: [id], onDelete: Cascade)
+  profession     String
+  experience     String   // years / description
+  qualifications String   // degrees, certifications
+  linkedin       String?
+  status         String   @default("pending")  // pending | approved | rejected
+  adminNote      String?
+  createdAt      DateTime @default(now())
+
+  @@map("expert_requests")
 }
