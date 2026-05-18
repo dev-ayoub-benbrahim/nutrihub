@@ -1,9 +1,11 @@
+import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Navbar  from './components/layout/Navbar';
 import Sidebar from './components/layout/Sidebar';
 import Footer  from './components/layout/Footer';
+import OnboardingWizard from './components/onboardingwizard';
 
 import Login               from './pages/Auth/Login';
 import Register            from './pages/Auth/Register';
@@ -18,16 +20,9 @@ import SavedPage           from './pages/Recipes/SavedPage';
 import AddRecipePage       from './pages/AddRecipe/AddRecipePage';
 import CommunitiesPage     from './pages/Community/CommunitiesPage';
 import CommunityDetailPage from './pages/Community/CommunityDetailPage';
-import PeoplePage           from './pages/People/PeoplePage';
-import AdminPage            from './pages/Admin/AdminPage';
-
-const Placeholder = ({ title }) => (
-  <div className="flex flex-col items-center justify-center py-20 text-center">
-    <p className="text-5xl mb-4 opacity-40">🚧</p>
-    <h2 className="font-serif text-2xl font-light text-cream mb-2">{title}</h2>
-    <p className="text-sm text-muted">Coming soon</p>
-  </div>
-);
+import PeoplePage          from './pages/People/PeoplePage';
+import AdminPage           from './pages/Admin/AdminPage';
+import MealPlannerPage     from './pages/MealPlanner/MealPlannerPage';
 
 const Spinner = () => (
   <div className="min-h-screen bg-forest flex items-center justify-center">
@@ -37,8 +32,19 @@ const Spinner = () => (
 
 function ProtectedLayout() {
   const { isAuthenticated, loading } = useAuth();
+  // Check if this is a brand-new registration
+  const [showOnboarding, setShowOnboarding] = useState(
+    () => sessionStorage.getItem('nutrihub_new_user') === '1'
+  );
+
+  const handleOnboardingComplete = () => {
+    sessionStorage.removeItem('nutrihub_new_user');
+    setShowOnboarding(false);
+  };
+
   if (loading)          return <Spinner />;
   if (!isAuthenticated) return <Navigate to="/login" replace />;
+
   return (
     <div className="min-h-screen bg-forest">
       <Navbar />
@@ -49,6 +55,10 @@ function ProtectedLayout() {
           <Footer />
         </main>
       </div>
+      {/* Onboarding wizard — shown once after new registration */}
+      {showOnboarding && (
+        <OnboardingWizard onComplete={handleOnboardingComplete} />
+      )}
     </div>
   );
 }
@@ -95,8 +105,8 @@ export default function App() {
             <Route path="/communities"      element={<CommunitiesPage />}     />
             <Route path="/communities/:id"  element={<CommunityDetailPage />} />
             <Route path="/people"           element={<PeoplePage />}          />
-            <Route path="/meal-planner"     element={<Placeholder title="Meal Planner" />} />
-            <Route path="/admin"            element={<AdminPage />}            />
+            <Route path="/meal-planner"     element={<MealPlannerPage />}     />
+            <Route path="/admin"            element={<AdminPage />}           />
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />

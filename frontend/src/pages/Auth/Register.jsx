@@ -29,8 +29,10 @@ export default function Register() {
   const onSubmit = async ({ name, email, password }) => {
     try {
       await registerUser(name, email, password);
+      // Mark as new user so the onboarding wizard shows in App.jsx
+      sessionStorage.setItem('nutrihub_new_user', '1');
       toast.success('Account created! Welcome to NutriHub 🎉');
-      navigate('/');
+      // Navigation handled by PublicLayout redirect (isAuthenticated becomes true)
     } catch (err) {
       toast.error(getErrorMessage(err));
     }
@@ -52,14 +54,19 @@ export default function Register() {
             Join the <span className="text-gold italic">community</span>
           </h1>
           <p className="text-[15px] text-muted leading-relaxed mb-8">
-            Create your account and start discovering recipes, generating personalised meal plans,
-            and connecting with food lovers.
+            Create your account and start discovering recipes, generating personalised
+            meal plans, and connecting with food lovers.
           </p>
           <div className="bg-forest2 border border-[rgba(74,124,89,0.2)] rounded-2xl p-5">
             <p className="text-[12px] font-semibold text-gold uppercase tracking-wide mb-3">
               Free forever includes
             </p>
-            {['Unlimited recipe browsing','AI meal plan generation','USDA nutritional validation','Community features'].map((f) => (
+            {[
+              'Unlimited recipe browsing',
+              'AI meal plan generation',
+              'USDA nutritional validation',
+              'Community features',
+            ].map((f) => (
               <div key={f} className="flex items-center gap-2.5 py-1.5">
                 <span className="text-sage text-sm">✓</span>
                 <span className="text-[13px] text-cream">{f}</span>
@@ -81,20 +88,22 @@ export default function Register() {
                             flex items-center justify-center font-serif text-xl font-bold text-forest">
               N
             </div>
-            <span className="font-serif text-xl text-cream">Nutri<span className="text-gold">Hub</span></span>
+            <span className="font-serif text-xl text-cream">
+              Nutri<span className="text-gold">Hub</span>
+            </span>
           </div>
 
           <h2 className="font-serif text-[28px] font-light text-cream mb-1.5">
             Create account
           </h2>
           <p className="text-[13px] text-muted mb-7">
-            Join the NutriHub community it's free!
+            Join the NutriHub community — it's free
           </p>
 
           <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
             <Input
               label="Full name"
-              placeholder="Ayoub Ben Brahim"
+              placeholder="Max Wood"
               error={errors.name?.message}
               {...register('name')}
             />
@@ -119,7 +128,6 @@ export default function Register() {
               error={errors.confirmPassword?.message}
               {...register('confirmPassword')}
             />
-
             <Button
               type="submit"
               fullWidth
@@ -132,7 +140,7 @@ export default function Register() {
           </form>
 
           <p className="text-center text-[13px] text-muted mt-5">
-            Already have an account?{' '}
+            Already have an account?{" "}
             <Link to="/login" className="text-gold hover:text-gold-l transition-colors">
               Sign in
             </Link>

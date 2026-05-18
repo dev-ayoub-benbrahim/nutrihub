@@ -6,7 +6,7 @@ import { getInitials, getErrorMessage, formatCookTime } from '../../utils/helper
 import Button from '../../components/ui/Button';
 import toast from 'react-hot-toast';
 
-// Post type config 
+// ── Post type config ───────────────────────────────────────────
 const POST_TYPES = {
   question: { label: 'Question',     emoji: '❓', color: 'text-blue-400',   border: 'border-blue-500/20',  bg: 'bg-blue-900/10'  },
   log:      { label: 'Cooking Log',  emoji: '📝', color: 'text-sage-l',     border: 'border-sage/20',      bg: 'bg-[rgba(74,124,89,0.08)]' },
@@ -50,7 +50,7 @@ export default function CommunityDetailPage() {
     loadFeed();
   }, [id]);
 
-  // Community actions 
+  // ── Community actions ────────────────────────────────────────
   const handleJoin = async () => {
     if (!user) return navigate('/login');
     setJoining(true);
@@ -135,7 +135,7 @@ export default function CommunityDetailPage() {
         <BackIcon/> Communities
       </button>
 
-      {/* Community header  */}
+      {/* ── Community header ────────────────────────────────── */}
       {!showEdit ? (
         <div className="bg-forest2 border border-[rgba(74,124,89,0.18)] rounded-2xl p-6 mb-6">
           <div className="flex items-start gap-4">
@@ -211,7 +211,7 @@ export default function CommunityDetailPage() {
         </form>
       )}
 
-      {/* Tabs */}
+      {/* ── Tabs ────────────────────────────────────────────── */}
       <div className="flex gap-1 mb-5 bg-forest2 p-1 rounded-xl w-fit border border-[rgba(74,124,89,0.18)]">
         {[
           { id: 'wall',    label: `Wall (${feed.length})` },
@@ -225,7 +225,7 @@ export default function CommunityDetailPage() {
         ))}
       </div>
 
-      {/* WALL TAB */}
+      {/* ── WALL TAB ────────────────────────────────────────── */}
       {activeTab === 'wall' && (
         <div className="flex flex-col gap-4">
 
@@ -269,7 +269,7 @@ export default function CommunityDetailPage() {
         </div>
       )}
 
-      {/* MEMBERS TAB */}
+      {/* ── MEMBERS TAB ─────────────────────────────────────── */}
       {activeTab === 'members' && (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3">
           {community.members?.map((member, i) => (
@@ -304,7 +304,7 @@ export default function CommunityDetailPage() {
   );
 }
 
-// ComposeBox 
+// ── ComposeBox ─────────────────────────────────────────────────
 function ComposeBox({ communityId, user, onCreated }) {
   const [postType,     setPostType]     = useState('question');
   const [content,      setContent]      = useState('');
@@ -489,14 +489,15 @@ function ComposeBox({ communityId, user, onCreated }) {
   );
 }
 
-// PostCard 
+// ── PostCard ───────────────────────────────────────────────────
 function PostCard({ item, user, communityId, canAdmin, onDelete, navigate, index }) {
-  const [showComments, setShowComments] = useState(false);
-  const [comments,     setComments]     = useState([]);
-  const [commentCount, setCommentCount] = useState(item.commentCount || 0);
+  const [showComments, setShowComments]   = useState(false);
+  const [comments,     setComments]       = useState([]);
+  const [commentCount, setCommentCount]   = useState(item.commentCount || 0);
   const [loadingComments, setLoadingComments] = useState(false);
-  const [reply,        setReply]        = useState('');
-  const [posting,      setPosting]      = useState(false);
+  const [reply,        setReply]          = useState('');
+  const [posting,      setPosting]        = useState(false);
+  const [verifiedId,   setVerifiedId]     = useState(null); // commentId of verified answer
 
   const config   = POST_TYPES[item.postType] || POST_TYPES.question;
   const isAuthor = user?.id === item.user?.id;
@@ -650,7 +651,7 @@ function PostCard({ item, user, communityId, canAdmin, onDelete, navigate, index
             ) : comments.length === 0 ? (
               <p className="text-[12px] text-muted text-center py-2">No replies yet — be the first</p>
             ) : (
-              comments.map(c => (
+              [...comments].sort((a, b) => (b.id === verifiedId ? 1 : 0) - (a.id === verifiedId ? 1 : 0)).map(c => (
                 <div key={c.id} className="flex gap-2.5 items-start">
                   <div onClick={() => navigate(`/users/${c.user?.id}`)}
                        className="w-7 h-7 rounded-full flex-shrink-0 bg-gradient-to-br from-sage to-rust
@@ -670,6 +671,28 @@ function PostCard({ item, user, communityId, canAdmin, onDelete, navigate, index
                         <span className="text-[10px] text-muted">
                           {new Date(c.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
                         </span>
+                        {/* Verified answer badge */}
+                        {verifiedId === c.id && (
+                          <span className="text-[10px] text-gold border border-gold/30
+                                           px-1.5 py-0.5 rounded-md flex-shrink-0">
+                            ✓ Verified
+                          </span>
+                        )}
+                        {/* Mark as verified — only the comment author if Expert */}
+                        {user?.role === 'EXPERT' && c.user?.id === user?.id && verifiedId !== c.id && (
+                          <button onClick={async () => {
+                                    try {
+                                      await api.post(
+                                        `/expert/communities/${communityId}/posts/${item.dbId}/comments/${c.id}/verify`
+                                      );
+                                      setVerifiedId(c.id);
+                                      toast.success('Marked as verified answer');
+                                    } catch (err) { toast.error(getErrorMessage(err)); }
+                                  }}
+                                  className="text-[10px] text-muted hover:text-gold transition-colors">
+                            Mark verified
+                          </button>
+                        )}
                         {(c.user?.id === user?.id || canAdmin) && (
                           <button onClick={() => handleDeleteComment(c.id)}
                                   className="text-[10px] text-muted hover:text-red-400 transition-colors">
@@ -715,7 +738,7 @@ function PostCard({ item, user, communityId, canAdmin, onDelete, navigate, index
   );
 }
 
-// Icons 
+// ── Icons ──────────────────────────────────────────────────────
 const BackIcon    = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polyline points="15 18 9 12 15 6"/></svg>;
 const PlusIcon    = () => <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>;
 const RemoveIcon  = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>;

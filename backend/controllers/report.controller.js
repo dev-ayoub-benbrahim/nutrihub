@@ -46,33 +46,47 @@ export const createReport = async (req, res) => {
 // ── POST /api/expert-requests ─────────────────────────────────
 export const createExpertRequest = async (req, res) => {
   try {
-    const { profession, experience, qualifications, linkedin } = req.body;
+    const { profession, experience, qualifications, linkedin, registrationNumber } = req.body;
 
     if (!profession || !experience || !qualifications)
       return res.status(400).json({ message: "Profession, experience, and qualifications are required" });
 
-    // Only USER role can apply
     if (req.user.role !== "USER")
       return res.status(400).json({ message: "You already have an elevated role" });
 
-    // Check for pending request
     const existing = await prisma.expertRequest.findFirst({
       where: { userId: req.user.id, status: "pending" },
     });
     if (existing)
       return res.status(409).json({ message: "You already have a pending expert request" });
 
+    // Handle optional credential document upload
+    let credentialURL = null;
+    if (req.file) {
+      const { v2: cloudinary } = await import("cloudinary");
+      const streamifier = await import("streamifier");
+      const result = await new Promise((resolve, reject) => {
+        cloudinary.uploader.upload_stream(
+          { folder: "nutrihub/credentials", resource_type: "auto" },
+          (err, res) => err ? reject(err) : resolve(res)
+        ).end(req.file.buffer);
+      });
+      credentialURL = result.secure_url;
+    }
+
     await prisma.expertRequest.create({
       data: {
-        userId:         req.user.id,
-        profession:     profession.trim(),
-        experience:     experience.trim(),
-        qualifications: qualifications.trim(),
-        linkedin:       linkedin?.trim() || null,
+        userId:             req.user.id,
+        profession:         profession.trim(),
+        experience:         experience.trim(),
+        qualifications:     qualifications.trim(),
+        registrationNumber: registrationNumber?.trim() || null,
+        linkedin:           linkedin?.trim() || null,
+        credentialURL,
       },
     });
 
-    res.status(201).json({ message: "Expert verification request submitted — we'll review it within 48 hours" });
+    res.status(201).json({ message: "Expert verification request submitted — we will review it within 48 hours" });
   } catch (error) {
     console.error("createExpertRequest error:", error);
     res.status(500).json({ message: "Server error" });

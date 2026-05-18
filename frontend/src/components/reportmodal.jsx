@@ -1,19 +1,11 @@
 import { useState } from 'react';
 import api from '../utils/axios';
-import Button from './ui/Button';
-import { getErrorMessage } from '../utils/helpers';
 import toast from 'react-hot-toast';
 
-const CATEGORIES = [
-  { value: 'Spam',           label: '🚫 Spam',                desc: 'Unwanted, repetitive, or promotional content' },
-  { value: 'Inappropriate',  label: '⚠️ Inappropriate',       desc: 'Offensive, adult, or disturbing content' },
-  { value: 'Misinformation', label: '❌ Misinformation',      desc: 'False or misleading health/nutrition claims' },
-  { value: 'Harassment',     label: '🛑 Harassment',          desc: 'Bullying, threats, or targeted abuse' },
-  { value: 'Other',          label: '📋 Other',               desc: 'Something else not listed above' },
-];
+const CATEGORIES = ['Spam', 'Inappropriate', 'Misinformation', 'Harassment', 'Other'];
 
 export default function ReportModal({ isOpen, onClose, recipeId, reportedUserId, context }) {
-  const [category, setCategory] = useState('');
+  const [category, setCategory] = useState('Other');
   const [reason,   setReason]   = useState('');
   const [loading,  setLoading]  = useState(false);
 
@@ -21,9 +13,10 @@ export default function ReportModal({ isOpen, onClose, recipeId, reportedUserId,
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!category) { toast.error('Please select a category'); return; }
-    if (reason.trim().length < 10) { toast.error('Please provide more detail (minimum 10 characters)'); return; }
-
+    if (reason.trim().length < 5) {
+      toast.error('Please provide a reason (minimum 5 characters)');
+      return;
+    }
     setLoading(true);
     try {
       await api.post('/reports', {
@@ -32,12 +25,12 @@ export default function ReportModal({ isOpen, onClose, recipeId, reportedUserId,
         ...(recipeId       && { recipeId }),
         ...(reportedUserId && { reportedUserId }),
       });
-      toast.success('Report submitted — thank you for keeping NutriHub safe');
-      setCategory('');
+      toast.success('Report submitted — our team will review it');
       setReason('');
+      setCategory('Other');
       onClose();
     } catch (err) {
-      toast.error(getErrorMessage(err));
+      toast.error(err?.response?.data?.message || 'Failed to submit report');
     } finally {
       setLoading(false);
     }
@@ -51,66 +44,71 @@ export default function ReportModal({ isOpen, onClose, recipeId, reportedUserId,
                       rounded-2xl w-full max-w-md z-10 overflow-hidden"
            onClick={e => e.stopPropagation()}>
 
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[rgba(74,124,89,0.18)]">
-          <div>
-            <h2 className="font-serif text-xl font-light text-cream">Report Content</h2>
-            {context && <p className="text-[12px] text-muted mt-0.5">Reporting: <span className="text-cream/70">{context}</span></p>}
-          </div>
-          <button onClick={onClose} className="text-muted hover:text-cream transition-colors text-2xl leading-none">×</button>
+        <div className="flex items-center justify-between px-5 py-4
+                        border-b border-[rgba(74,124,89,0.15)]">
+          <h2 className="font-semibold text-[16px] text-cream">Report Content</h2>
+          <button onClick={onClose}
+                  className="text-muted hover:text-cream text-2xl leading-none">×</button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 flex flex-col gap-4">
-          {/* Category */}
-          <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.5px] text-muted mb-2">
-              What's the issue?
+        {context && (
+          <div className="px-5 py-3 bg-forest/50 border-b border-[rgba(74,124,89,0.1)]">
+            <p className="text-[12px] text-muted">
+              Reporting: <span className="text-cream">{context}</span>
             </p>
-            <div className="flex flex-col gap-2">
-              {CATEGORIES.map(cat => (
-                <label key={cat.value}
-                       className={`flex items-start gap-3 p-3 rounded-xl border cursor-pointer
-                                   transition-all duration-200
-                                   ${category === cat.value
-                                     ? 'border-sage bg-[rgba(74,124,89,0.14)]'
-                                     : 'border-[rgba(74,124,89,0.18)] hover:border-sage/40'}`}>
-                  <input type="radio" name="category" value={cat.value}
-                         checked={category === cat.value}
-                         onChange={() => setCategory(cat.value)}
-                         className="mt-0.5 flex-shrink-0 accent-sage"/>
-                  <div>
-                    <p className="text-[13px] font-medium text-cream">{cat.label}</p>
-                    <p className="text-[11px] text-muted">{cat.desc}</p>
-                  </div>
-                </label>
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="p-5 flex flex-col gap-4">
+          <div>
+            <label className="text-[11px] font-semibold uppercase tracking-wide text-muted block mb-1.5">
+              Category
+            </label>
+            <div className="flex flex-wrap gap-2">
+              {CATEGORIES.map(c => (
+                <button key={c} type="button" onClick={() => setCategory(c)}
+                        className={`text-[12px] px-3 py-1.5 rounded-xl border transition-all
+                                    ${category === c
+                                      ? 'border-rust/50 bg-[rgba(196,98,45,0.12)] text-rust-l'
+                                      : 'border-[rgba(74,124,89,0.2)] text-muted hover:text-cream'}`}>
+                  {c}
+                </button>
               ))}
             </div>
           </div>
 
-          {/* Detail */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-[11px] font-semibold uppercase tracking-[0.5px] text-muted">
-              Additional detail
+          <div>
+            <label className="text-[11px] font-semibold uppercase tracking-wide text-muted block mb-1.5">
+              Reason <span className="text-red-400">*</span>
             </label>
             <textarea
               value={reason}
               onChange={e => setReason(e.target.value)}
-              placeholder="Please describe the issue in more detail..."
-              rows={3}
-              maxLength={500}
+              placeholder="Describe the issue so our team can review it..."
+              rows={4}
+              required
               className="w-full bg-forest border border-[rgba(74,124,89,0.25)] rounded-xl
-                         px-4 py-3 text-sm text-cream placeholder:text-muted
+                         px-3.5 py-3 text-cream text-sm placeholder:text-muted
                          outline-none focus:border-sage transition-colors resize-none"
             />
-            <div className="flex justify-between">
-              <p className="text-[11px] text-muted">Be specific — it helps us act faster</p>
-              <p className="text-[11px] text-muted">{reason.length}/500</p>
-            </div>
+            <p className="text-[10px] text-muted mt-1">
+              {reason.length} characters {reason.length < 5 ? '— minimum 5 required' : ''}
+            </p>
           </div>
 
-          <div className="flex gap-2 pt-1">
-            <Button type="submit" loading={loading} fullWidth>Submit Report</Button>
-            <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
+          <div className="flex gap-2">
+            <button type="submit"
+                    disabled={loading || reason.trim().length < 5}
+                    className="flex-1 py-2.5 rounded-xl text-sm font-medium
+                               bg-[rgba(196,98,45,0.15)] hover:bg-[rgba(196,98,45,0.25)]
+                               text-rust-l border border-rust/30 transition-all disabled:opacity-40">
+              {loading ? 'Submitting…' : 'Submit Report'}
+            </button>
+            <button type="button" onClick={onClose}
+                    className="px-4 py-2.5 rounded-xl text-sm text-muted hover:text-cream
+                               border border-[rgba(74,124,89,0.2)] hover:border-sage transition-all">
+              Cancel
+            </button>
           </div>
         </form>
       </div>

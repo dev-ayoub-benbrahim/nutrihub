@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -9,10 +9,11 @@ import { getErrorMessage } from '../utils/helpers';
 import toast from 'react-hot-toast';
 
 const schema = z.object({
-  profession:     z.string().min(3,  'Profession is required'),
-  experience:     z.string().min(5,  'Please describe your experience'),
-  qualifications: z.string().min(10, 'Please describe your qualifications'),
-  linkedin:       z.string().url('Enter a valid URL').optional().or(z.literal('')),
+  profession:         z.string().min(3, 'Profession is required'),
+  experience:         z.string().min(5, 'Please describe your experience'),
+  qualifications:     z.string().min(10, 'Please describe your qualifications'),
+  registrationNumber: z.string().optional(),
+  linkedin:           z.string().url('Enter a valid URL').optional().or(z.literal('')),
 });
 
 const PROFESSIONS = [
@@ -28,23 +29,43 @@ const PROFESSIONS = [
 ];
 
 export default function ExpertVerificationModal({ isOpen, onClose }) {
-  const [step, setStep] = useState(1);
+  const [credFile,    setCredFile]    = useState(null);
+  const [credPreview, setCredPreview] = useState(null);
+  const fileRef = useRef(null);
 
-  const { register, handleSubmit, formState: { errors, isSubmitting }, watch } = useForm({
+  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm({
     resolver: zodResolver(schema),
   });
 
   if (!isOpen) return null;
 
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (file.size > 8 * 1024 * 1024) { toast.error('File must be under 8MB'); return; }
+    setCredFile(file);
+    if (file.type.startsWith('image/')) {
+      setCredPreview(URL.createObjectURL(file));
+    } else {
+      setCredPreview(null); // PDF — no preview
+    }
+  };
+
   const onSubmit = async (data) => {
     try {
-      await api.post('/reports/expert-requests', {
-        profession:     data.profession,
-        experience:     data.experience,
-        qualifications: data.qualifications,
-        linkedin:       data.linkedin || undefined,
+      const fd = new FormData();
+      fd.append('profession',         data.profession);
+      fd.append('experience',         data.experience);
+      fd.append('qualifications',     data.qualifications);
+      if (data.registrationNumber) fd.append('registrationNumber', data.registrationNumber);
+      if (data.linkedin)           fd.append('linkedin',           data.linkedin);
+      if (credFile)                fd.append('credential',         credFile);
+
+      await api.post('/reports/expert-requests', fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
       });
-      toast.success('Application submitted! We\'ll review it within 48 hours.');
+
+      toast.success('Application submitted — we\'ll review it within 48 hours');
       onClose();
     } catch (err) {
       toast.error(getErrorMessage(err));
@@ -56,7 +77,8 @@ export default function ExpertVerificationModal({ isOpen, onClose }) {
          onClick={onClose}>
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm"/>
       <div className="relative bg-forest2 border border-[rgba(74,124,89,0.25)]
-                      rounded-2xl w-full max-w-lg z-10 overflow-hidden max-h-[90vh] flex flex-col"
+                      rounded-2xl w-full max-w-lg z-10 overflow-hidden
+                      max-h-[92vh] flex flex-col"
            onClick={e => e.stopPropagation()}>
 
         {/* Header */}
@@ -67,21 +89,21 @@ export default function ExpertVerificationModal({ isOpen, onClose }) {
               <h2 className="font-serif text-xl font-light text-cream">Apply for Expert Status</h2>
             </div>
             <p className="text-[12px] text-muted">
-              Verified experts receive a gold badge and increased credibility across the platform
+              Verified experts receive a gold badge and can annotate recipes and mark verified answers
             </p>
           </div>
-          <button onClick={onClose} className="text-muted hover:text-cream transition-colors text-2xl leading-none ml-4">×</button>
+          <button onClick={onClose} className="text-muted hover:text-cream text-2xl leading-none ml-4">×</button>
         </div>
 
-        {/* Benefits banner */}
+        {/* Benefits */}
         <div className="px-6 py-3 bg-[rgba(212,168,67,0.07)] border-b border-[rgba(212,168,67,0.15)]">
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-6 flex-wrap">
             {[
-              ['✓ Gold badge',         'on all your posts'],
-              ['✓ Expert label',       'in discussions'],
-              ['✓ Increased trust',    'from community'],
+              ['✓ Gold badge',        'on your profile & posts'],
+              ['📋 Recipe notes',     'add professional annotations'],
+              ['💬 Verified answers', 'mark your replies as verified'],
             ].map(([title, sub]) => (
-              <div key={title} className="text-center">
+              <div key={title}>
                 <p className="text-[12px] font-semibold text-gold">{title}</p>
                 <p className="text-[10px] text-muted">{sub}</p>
               </div>
@@ -90,9 +112,10 @@ export default function ExpertVerificationModal({ isOpen, onClose }) {
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit(onSubmit)} className="p-6 flex flex-col gap-4 overflow-y-auto">
+        <form onSubmit={handleSubmit(onSubmit)}
+              className="p-6 flex flex-col gap-4 overflow-y-auto">
 
-          {/* Profession dropdown */}
+          {/* Profession */}
           <div className="flex flex-col gap-1.5">
             <label className="text-[11px] font-semibold uppercase tracking-[0.5px] text-muted">
               Your Profession *
@@ -112,14 +135,12 @@ export default function ExpertVerificationModal({ isOpen, onClose }) {
             <label className="text-[11px] font-semibold uppercase tracking-[0.5px] text-muted">
               Years of Experience & Background *
             </label>
-            <textarea
-              placeholder="e.g. 5 years as a Registered Dietitian working with athletes, specialising in sports performance nutrition..."
-              rows={2}
-              className="w-full bg-forest border border-[rgba(74,124,89,0.25)] rounded-[10px]
-                         px-3.5 py-2.5 text-cream text-sm placeholder:text-muted
-                         outline-none focus:border-sage transition-colors resize-none"
-              {...register('experience')}
-            />
+            <textarea placeholder="e.g. 5 years as a Registered Dietitian specialising in sports nutrition..."
+                      rows={2}
+                      className="w-full bg-forest border border-[rgba(74,124,89,0.25)] rounded-[10px]
+                                 px-3.5 py-2.5 text-cream text-sm placeholder:text-muted
+                                 outline-none focus:border-sage transition-colors resize-none"
+                      {...register('experience')}/>
             {errors.experience && <p className="text-red-400 text-xs">{errors.experience.message}</p>}
           </div>
 
@@ -128,28 +149,67 @@ export default function ExpertVerificationModal({ isOpen, onClose }) {
             <label className="text-[11px] font-semibold uppercase tracking-[0.5px] text-muted">
               Qualifications & Certifications *
             </label>
-            <textarea
-              placeholder="e.g. BSc Nutrition (University of Nottingham), Registered with the Association for Nutrition, CSSD certified..."
-              rows={2}
-              className="w-full bg-forest border border-[rgba(74,124,89,0.25)] rounded-[10px]
-                         px-3.5 py-2.5 text-cream text-sm placeholder:text-muted
-                         outline-none focus:border-sage transition-colors resize-none"
-              {...register('qualifications')}
-            />
+            <textarea placeholder="e.g. BSc Nutrition (University of Nottingham), Registered with AfN, CSSD certified..."
+                      rows={2}
+                      className="w-full bg-forest border border-[rgba(74,124,89,0.25)] rounded-[10px]
+                                 px-3.5 py-2.5 text-cream text-sm placeholder:text-muted
+                                 outline-none focus:border-sage transition-colors resize-none"
+                      {...register('qualifications')}/>
             {errors.qualifications && <p className="text-red-400 text-xs">{errors.qualifications.message}</p>}
           </div>
 
+          {/* Registration Number */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[11px] font-semibold uppercase tracking-[0.5px] text-muted">
+              Professional Registration Number
+              <span className="text-muted/60 font-normal normal-case ml-1">(optional but strongly recommended)</span>
+            </label>
+            <input placeholder="e.g. AfN: AN12345  ·  BDA: 123456  ·  NMC: 12A3456E"
+                   className="bg-forest border border-[rgba(74,124,89,0.25)] rounded-[10px]
+                              px-3.5 py-2.5 text-cream text-sm placeholder:text-muted
+                              outline-none focus:border-sage transition-colors"
+                   {...register('registrationNumber')}/>
+            <p className="text-[10px] text-muted">
+              This allows us to verify your registration with your professional body
+            </p>
+          </div>
+
           {/* LinkedIn */}
-          <Input
-            label="LinkedIn Profile or Website (optional)"
-            placeholder="https://linkedin.com/in/your-profile"
-            error={errors.linkedin?.message}
-            {...register('linkedin')}
-          />
+          <Input label="LinkedIn Profile or Website (optional)"
+                 placeholder="https://linkedin.com/in/your-profile"
+                 error={errors.linkedin?.message}
+                 {...register('linkedin')}/>
+
+          {/* Credential document */}
+          <div className="flex flex-col gap-1.5">
+            <label className="text-[11px] font-semibold uppercase tracking-[0.5px] text-muted">
+              Upload Credential Document
+              <span className="text-muted/60 font-normal normal-case ml-1">(optional — certificate, ID card, or professional registration letter)</span>
+            </label>
+            <div className="flex items-center gap-3">
+              <button type="button" onClick={() => fileRef.current?.click()}
+                      className="text-[12px] text-sage-l hover:text-cream border border-[rgba(74,124,89,0.25)]
+                                 hover:border-sage px-4 py-2 rounded-xl transition-all flex-shrink-0">
+                {credFile ? '✓ ' + credFile.name.slice(0, 30) : 'Choose file (JPG, PNG, PDF)'}
+              </button>
+              {credFile && (
+                <button type="button" onClick={() => { setCredFile(null); setCredPreview(null); }}
+                        className="text-muted hover:text-red-400 text-sm transition-colors">
+                  Remove
+                </button>
+              )}
+            </div>
+            <input ref={fileRef} type="file" accept="image/*,.pdf" onChange={handleFileChange} className="hidden"/>
+            {credPreview && (
+              <img src={credPreview} alt="Credential preview"
+                   className="w-32 h-20 object-cover rounded-xl border border-[rgba(74,124,89,0.25)] mt-1"/>
+            )}
+            <p className="text-[10px] text-muted">Max 8MB. Accepted: JPG, PNG, PDF</p>
+          </div>
 
           {/* Disclaimer */}
           <p className="text-[11px] text-muted leading-relaxed bg-forest/50 rounded-xl px-3 py-2.5">
-            By submitting, you confirm that the information provided is accurate.
+            By submitting, you confirm all information is accurate.
             False applications will result in account restrictions.
             Applications are typically reviewed within 48 hours.
           </p>

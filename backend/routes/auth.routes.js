@@ -1,6 +1,6 @@
 import express from "express";
 import multer  from "multer";
-import { registerUser, loginUser, getMe, updateProfile } from "../controllers/auth.controller.js";
+import { registerUser, loginUser, getMe, updateProfile, deleteAccount, changeEmail, changePassword } from "../controllers/auth.controller.js";
 import { protect } from "../middleware/auth.middleware.js";
 
 const router = express.Router();
@@ -19,5 +19,9 @@ router.post("/register", registerUser);
 router.post("/login",    loginUser);
 router.get ("/me",       protect, getMe);
 router.put ("/me",       protect, upload.single("avatar"), updateProfile);
+
+router.delete("/me",       protect, deleteAccount);
+router.put   ("/password", protect, changePassword);
+router.put   ("/email",    protect, changeEmail);
 
 export default router;

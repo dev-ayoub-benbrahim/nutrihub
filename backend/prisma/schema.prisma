@@ -46,6 +46,7 @@ model User {
   calorieTarget  Int?
   goal           Goal?
   restrictions   String[]
+  cuisinePrefs   String[]  // preferred cuisines for the For You feed
   createdAt      DateTime @default(now())
   updateAt       DateTime @updatedAt
 
@@ -64,6 +65,8 @@ model User {
   notifications     Notification[]  @relation("notifications")
   reportsMade       Report[]        @relation("reports_made")
   expertRequests    ExpertRequest[] @relation("expertRequests")
+  expertNotes       ExpertNote[]    @relation("expertNotes")
+  verifiedAnswers   VerifiedAnswer[] @relation("verifiedAnswers")
   postComments      CommunityPostComment[] @relation("postComments")
 
   @@map("users")
@@ -87,6 +90,7 @@ model Recipe {
   proteinPerServing  Float?
   carbsPerServing    Float?
   fatPerServing      Float?
+  hasManualEntries   Boolean @default(false) // true if any ingredient used author-estimated nutrition
   userId      Int
   user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt   DateTime   @default(now())
@@ -99,6 +103,8 @@ model Recipe {
   saves            Save[]
   comments         Comment[]
   communityRecipes CommunityRecipe[]
+  expertNotes      ExpertNote[]
+  reports          Report[]
 
   @@map("recipes")
 }
@@ -111,6 +117,12 @@ model RecipeIngredient {
   ingredient   Ingredient @relation(fields: [ingredientId], references: [id])
   quantity     Float
   unit         String
+  // Manual nutrition entry — recipe-scoped, never shared to other recipes
+  // Only used when ingredient is not found in the built-in nutrition table
+  manualCalories Float?   // kcal per 100g, author estimate
+  manualProtein  Float?   // g per 100g
+  manualCarbs    Float?   // g per 100g
+  manualFat      Float?   // g per 100g
 
   @@map("recipe_ingredients")
 }
@@ -291,7 +303,8 @@ model MealPlan {
   rawInput      String
   createdAt     DateTime @default(now())
 
-  meals Meal[]
+  meals    Meal[]
+  mealLogs MealLog[]
 
   @@map("meal_plans")
 }
@@ -302,7 +315,8 @@ model Meal {
   mealPlan   MealPlan @relation(fields: [mealPlanId], references: [id], onDelete: Cascade)
   dayNumber  Int
   mealType   MealType
-  name       String
+  name        String
+  description String?  // cooking instructions from GPT
 
   totalCalories Float @default(0)
   totalProteinG Float @default(0)
@@ -337,17 +351,21 @@ model MealIngredient {
 }
 
 model MealLog {
-  id       Int      @id @default(autoincrement())
-  userId   Int
-  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  mealId   Int
-  meal     Meal     @relation(fields: [mealId], references: [id], onDelete: Cascade)
-  loggedAt DateTime @default(now())
-  calories Float
-  proteinG Float
-  carbsG   Float
-  fatG     Float
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mealId     Int
+  meal       Meal     @relation(fields: [mealId], references: [id], onDelete: Cascade)
+  mealPlanId Int      // which plan this log belongs to
+  mealPlan   MealPlan @relation(fields: [mealPlanId], references: [id], onDelete: Cascade)
+  dayNumber  Int      // 1-7, which day of the plan
+  loggedAt   DateTime @default(now())
+  calories   Float
+  proteinG   Float
+  carbsG     Float
+  fatG       Float
 
+  @@unique([userId, mealId])  // one log per meal ever — prevents all duplicates
   @@map("meal_logs")
 }
 
@@ -372,9 +390,10 @@ model Report {
   id             Int      @id @default(autoincrement())
   reporterId     Int
   reporter       User     @relation("reports_made", fields: [reporterId], references: [id], onDelete: Cascade)
-  category       String   @default("Other")  // Spam | Inappropriate | Misinformation | Harassment | Other
+  category       String   @default("Other")
   reason         String
   recipeId       Int?
+  recipe         Recipe?  @relation(fields: [recipeId], references: [id], onDelete: SetNull)
   reportedUserId Int?
   resolved       Boolean  @default(false)
   resolvedNote   String?
@@ -385,16 +404,45 @@ model Report {
 
 // Dedicated expert verification requests — separate from reports
 model ExpertRequest {
-  id             Int      @id @default(autoincrement())
-  userId         Int
-  user           User     @relation("expertRequests", fields: [userId], references: [id], onDelete: Cascade)
-  profession     String
-  experience     String   // years / description
-  qualifications String   // degrees, certifications
-  linkedin       String?
-  status         String   @default("pending")  // pending | approved | rejected
-  adminNote      String?
-  createdAt      DateTime @default(now())
+  id                 Int      @id @default(autoincrement())
+  userId             Int
+  user               User     @relation("expertRequests", fields: [userId], references: [id], onDelete: Cascade)
+  profession         String
+  experience         String
+  qualifications     String
+  registrationNumber String?  // Professional body registration number e.g. "BDA12345"
+  linkedin           String?
+  credentialURL      String?  // Cloudinary URL of uploaded certificate/ID photo
+  status             String   @default("pending")  // pending | approved | rejected
+  adminNote          String?
+  createdAt          DateTime @default(now())
 
   @@map("expert_requests")
+}
+
+// Expert annotation on a recipe — only verified experts can add these
+model ExpertNote {
+  id        Int      @id @default(autoincrement())
+  recipeId  Int
+  recipe    Recipe   @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  expertId  Int
+  expert    User     @relation("expertNotes", fields: [expertId], references: [id], onDelete: Cascade)
+  content   String   // professional annotation text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([recipeId, expertId]) // one note per expert per recipe
+  @@map("expert_notes")
+}
+
+// Verified answer on a community post comment — expert marks their reply
+model VerifiedAnswer {
+  id        Int      @id @default(autoincrement())
+  postId    Int      @unique // one verified answer per post
+  commentId Int      @unique
+  expertId  Int
+  expert    User     @relation("verifiedAnswers", fields: [expertId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@map("verified_answers")
 }

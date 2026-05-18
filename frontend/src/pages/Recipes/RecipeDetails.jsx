@@ -20,16 +20,26 @@ export default function RecipeDetails() {
   const [likeCount,setLikeCount]= useState(0);
   const [comment,  setComment]  = useState('');
   const [posting,  setPosting]  = useState(false);
-  const [showReport, setShowReport] = useState(false);
+  const [showReport,    setShowReport]    = useState(false);
+
+  const [expertNote,    setExpertNote]    = useState(null);
+  const [relatedRecipes, setRelatedRecipes] = useState([]);
+  const [showNoteForm,  setShowNoteForm]  = useState(false);
+  const [noteContent,   setNoteContent]   = useState('');
+  const [savingNote,    setSavingNote]    = useState(false);
 
   useEffect(() => {
     const fetch = async () => {
       setLoading(true);
       try {
-        const { data } = await api.get(`/recipes/${id}`);
+        const [{ data }, noteRes] = await Promise.all([
+          api.get(`/recipes/${id}`),
+          api.get(`/expert/recipes/${id}/note`).catch(() => ({ data: { note: null } })),
+        ]);
+        setExpertNote(noteRes.data.note);
+        setRelatedRecipes(data.relatedRecipes || []);
         setRecipe(data);
         setLikeCount(data._count?.likes || 0);
-        // Restore like/save state from server — fixes the "liked but looks unliked" bug
         setLiked(data.isLiked || false);
         setSaved(data.isSaved || false);
       } catch (err) {
@@ -282,7 +292,7 @@ export default function RecipeDetails() {
 
         {/* Ingredients */}
         <div className="bg-forest2 border border-[rgba(74,124,89,0.18)] rounded-2xl p-5">
-          <h2 className="font-serif text-[18px] font-light text-cream mb-4 flex items-center gap-2">
+          <h2 className="font-serif text-[18px] font-light text-cream flex items-center gap-2 mb-4">
             <span className="text-gold">🥗</span> Ingredients
           </h2>
           {recipe.ingredients?.length > 0 ? (
@@ -295,7 +305,7 @@ export default function RecipeDetails() {
                     {ri.ingredient?.name || ri.name}
                   </span>
                   <span className="text-[13px] text-gold font-medium ml-3 flex-shrink-0">
-                    {ri.quantity} {ri.unit}
+                    {ri.quantity % 1 === 0 ? ri.quantity : Number(ri.quantity).toFixed(1)} {ri.unit}
                   </span>
                 </li>
               ))}
@@ -304,7 +314,6 @@ export default function RecipeDetails() {
             <p className="text-muted text-sm">No ingredients listed</p>
           )}
         </div>
-
         {/* Nutrition */}
         <div className="bg-forest2 border border-[rgba(74,124,89,0.18)] rounded-2xl p-5">
           <h2 className="font-serif text-[18px] font-light text-cream mb-4 flex items-center gap-2">
@@ -338,11 +347,11 @@ export default function RecipeDetails() {
             ))}
           </div>
           <p className="text-[10px] text-muted mt-3">
-            {recipe.ingredients?.some(i => i.ingredient?.caloriesPer100g)
-              ? '✓ Calculated from USDA FoodData Central data'
-              : recipe.caloriesPerServing
-                ? '📝 Values entered by recipe author'
-                : 'Nutritional data not yet available'
+            {recipe.caloriesPerServing
+              ? recipe.hasManualEntries
+                ? '📝 Partially estimated by recipe author — not USDA validated'
+                : '✓ Auto-calculated from ingredients'
+              : 'Nutritional data not available for these ingredients'
             }
           </p>
         </div>
@@ -369,6 +378,98 @@ export default function RecipeDetails() {
               </li>
             ))}
           </ol>
+        </div>
+      )}
+
+      {/* Expert Note — visible to all, editable by experts */}
+      {(expertNote || user?.role === 'EXPERT' || user?.role === 'ADMIN') && (
+        <div className={`rounded-2xl border p-5 mb-5
+                          ${expertNote
+                            ? 'bg-[rgba(212,168,67,0.06)] border-gold/25'
+                            : 'bg-forest2 border-[rgba(74,124,89,0.18)]'}`}>
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-2.5 flex-shrink-0">
+              <span className="text-gold text-base">✓</span>
+              <p className="text-[12px] font-semibold text-gold uppercase tracking-wide">
+                Expert Note
+              </p>
+            </div>
+            {(user?.role === 'EXPERT' || user?.role === 'ADMIN') && (
+              <button onClick={() => { setShowNoteForm(s => !s); setNoteContent(expertNote?.content || ''); }}
+                      className="text-[11px] text-muted hover:text-cream border border-[rgba(74,124,89,0.2)]
+                                 hover:border-sage px-2.5 py-1 rounded-lg transition-all flex-shrink-0">
+                {expertNote ? 'Edit note' : '+ Add note'}
+              </button>
+            )}
+          </div>
+
+          {expertNote && !showNoteForm && (
+            <div className="mt-3">
+              <p className="text-[14px] text-cream/90 leading-relaxed">{expertNote.content}</p>
+              <div className="flex items-center gap-2 mt-2.5">
+                <div className="w-5 h-5 rounded-full bg-gradient-to-br from-sage to-rust
+                                flex items-center justify-center text-[9px] font-bold text-cream overflow-hidden flex-shrink-0">
+                  {expertNote.expert?.avatarURL
+                    ? <img src={expertNote.expert.avatarURL} alt="" className="w-full h-full object-cover"/>
+                    : (expertNote.expert?.name?.[0] || '?')}
+                </div>
+                <p className="text-[11px] text-muted">
+                  <span className="text-gold">{expertNote.expert?.name}</span>
+                  {expertNote.expert?.specialisation && ` · ${expertNote.expert.specialisation}`}
+                </p>
+                {user?.id === expertNote.expert?.id && (
+                  <button onClick={async () => {
+                              await api.delete(`/expert/recipes/${id}/note`).catch(() => {});
+                              setExpertNote(null);
+                              toast.success('Note removed');
+                            }}
+                          className="text-[10px] text-muted hover:text-red-400 transition-colors ml-auto">
+                    Remove
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {!expertNote && !showNoteForm && (
+            <p className="text-[13px] text-muted mt-2">
+              No expert annotation yet. Add your professional assessment of this recipe.
+            </p>
+          )}
+
+          {showNoteForm && (
+            <div className="mt-3 flex flex-col gap-2">
+              <textarea value={noteContent} onChange={e => setNoteContent(e.target.value)}
+                        placeholder="Write your professional assessment of this recipe — nutritional quality, suggested modifications, health considerations..."
+                        rows={3} maxLength={600}
+                        className="w-full bg-forest border border-[rgba(74,124,89,0.25)] rounded-xl
+                                   px-4 py-3 text-sm text-cream placeholder:text-muted
+                                   outline-none focus:border-sage transition-colors resize-none"/>
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] text-muted">{noteContent.length}/600</span>
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => setShowNoteForm(false)}
+                          className="text-[12px] text-muted hover:text-cream border border-[rgba(74,124,89,0.2)]
+                                     px-3 py-1.5 rounded-lg transition-all">Cancel</button>
+                  <button type="button" disabled={savingNote || noteContent.trim().length < 10}
+                          onClick={async () => {
+                            setSavingNote(true);
+                            try {
+                              const { data } = await api.post(`/expert/recipes/${id}/note`, { content: noteContent.trim() });
+                              setExpertNote(data.note);
+                              setShowNoteForm(false);
+                              toast.success('Note saved');
+                            } catch (err) { toast.error(getErrorMessage(err)); }
+                            finally { setSavingNote(false); }
+                          }}
+                          className="text-[12px] text-cream bg-sage hover:bg-sage-l px-4 py-1.5
+                                     rounded-lg transition-all disabled:opacity-40">
+                    {savingNote ? 'Saving…' : 'Save note'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -446,6 +547,45 @@ export default function RecipeDetails() {
         )}
       </div>
 
+      {/* Related recipes */}
+      {relatedRecipes.length > 0 && (
+        <div className="mb-7 anim-up">
+          <h2 className="font-serif text-[20px] font-light text-cream mb-4">
+            You might also like
+          </h2>
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-4">
+            {relatedRecipes.slice(0, 4).map((r, i) => (
+              <div key={r.id}
+                   onClick={() => navigate(`/recipes/${r.id}`)}
+                   className="bg-forest2 border border-[rgba(74,124,89,0.18)] rounded-2xl
+                              overflow-hidden cursor-pointer hover:border-[rgba(74,124,89,0.35)]
+                              transition-all duration-200 anim-up group"
+                   style={{ animationDelay: `${i * 0.07}s` }}>
+                <div className="h-32 bg-forest3 overflow-hidden">
+                  {r.imageURL
+                    ? <img src={r.imageURL} alt={r.title}
+                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"/>
+                    : <div className="w-full h-full flex items-center justify-center text-4xl opacity-20">🍽️</div>
+                  }
+                </div>
+                <div className="p-3">
+                  <p className="text-[14px] font-medium text-cream truncate">{r.title}</p>
+                  <div className="flex items-center gap-3 mt-1 text-[11px] text-muted">
+                    {r.cuisine && <span>{r.cuisine}</span>}
+                    <span>❤ {r._count?.likes || 0}</span>
+                    {r.difficulty && (
+                      <span className={r.difficulty === 'EASY' ? 'text-sage-l' : r.difficulty === 'MEDIUM' ? 'text-gold' : 'text-rust-l'}>
+                        {r.difficulty.charAt(0) + r.difficulty.slice(1).toLowerCase()}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       <ReportModal
         isOpen={showReport}
         onClose={() => setShowReport(false)}
@@ -456,7 +596,7 @@ export default function RecipeDetails() {
   );
 }
 
-// Loading / Error states 
+// ── Loading / Error states ─────────────────────────────────────
 function LoadingState() {
   return (
     <div className="max-w-4xl mx-auto animate-pulse">
@@ -482,7 +622,7 @@ function ErrorState({ message, onBack }) {
   );
 }
 
-// Icons 
+// ── Icons ──────────────────────────────────────────────────────
 const BackIcon     = () => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><polyline points="15 18 9 12 15 6"/></svg>;
 const ClockIcon    = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>;
 const HeartIcon    = ({ filled }) => <svg width="15" height="15" viewBox="0 0 24 24" fill={filled ? "currentColor" : "none"} stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>;

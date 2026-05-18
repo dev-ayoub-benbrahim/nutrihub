@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../utils/axios';
+import ReportActionModal from '../../components/reportmodal.jsx';
 import { useAuth } from '../../hooks/useAuth';
 import { getInitials, getErrorMessage, formatCount } from '../../utils/helpers';
 import Button from '../../components/ui/Button';
@@ -10,6 +11,7 @@ export default function AdminPage() {
   const { user }    = useAuth();
   const navigate    = useNavigate();
   const [activeTab, setTab]       = useState('reports');
+  const [reportModal, setReportModal] = useState(null); // { report, action }
   const [stats,     setStats]     = useState(null);
   const [reports,   setReports]   = useState([]);
   const [requests,  setRequests]  = useState([]);
@@ -52,23 +54,21 @@ export default function AdminPage() {
     if (activeTab === 'users') loadUsers(userQuery);
   }, [activeTab, userQuery]);
 
-  const handleResolveReport = async (reportId, action = 'dismiss') => {
-    const notes = { dismiss: 'No violation found', warn: 'User warned by admin', remove: 'Content removed' };
+  const openReportModal = (report, action) => setReportModal({ report, action });
+
+  const handleResolveReport = async (reportId, action, message = '') => {
     try {
-      await api.put(`/admin/reports/${reportId}/resolve`, { resolvedNote: notes[action] });
+      await api.put(`/admin/reports/${reportId}/resolve`, { action, adminMessage: message });
       setReports(prev => prev.filter(r => r.id !== reportId));
-      toast.success(action === 'dismiss' ? 'Report dismissed' : action === 'warn' ? 'User warned' : 'Content removed');
+      setReportModal(null);
+      toast.success('Report resolved — notifications sent');
     } catch (err) { toast.error(getErrorMessage(err)); }
   };
 
-  const handleDeleteContent = async (recipeId, type, reportId) => {
-    if (!window.confirm('Delete this recipe? This cannot be undone.')) return;
-    try {
-      await api.delete(`/recipes/${recipeId}`);
-      await api.put(`/admin/reports/${reportId}/resolve`, { resolvedNote: 'Content removed by admin' });
-      setReports(prev => prev.filter(r => r.id !== reportId));
-      toast.success('Recipe deleted and report resolved');
-    } catch (err) { toast.error(getErrorMessage(err)); }
+  const handleDeleteContent = (recipeId, type, reportId) => {
+    // Find the report and open modal with delete action
+    const report = reports.find(r => r.id === reportId);
+    if (report) openReportModal(report, 'delete');
   };
 
   const handleExpertDecision = async (requestId, decision) => {
@@ -93,9 +93,10 @@ export default function AdminPage() {
   if (!user || user.role !== 'ADMIN') return null;
 
   const TABS = [
-    { id: 'reports',  label: `Reports (${reports.length})`   },
-    { id: 'experts',  label: `Expert Requests (${requests.length})` },
-    { id: 'users',    label: 'Users'                         },
+    { id: 'reports',   label: `Reports (${reports.length})`           },
+    { id: 'experts',   label: `Expert Requests (${requests.length})`  },
+    { id: 'users',     label: 'Users'                                  },
+    { id: 'analytics', label: 'Analytics'                              },
   ];
 
   return (
@@ -109,17 +110,17 @@ export default function AdminPage() {
 
       {/* Stats row */}
       {stats && (
-        <div className="grid grid-cols-5 gap-3 mb-6">
+        <div className="grid grid-cols-4 gap-3 mb-6">
           {[
-            [stats.users,                'Users',           'text-cream'],
-            [stats.recipes,              'Recipes',         'text-cream'],
-            [stats.communities,          'Communities',     'text-cream'],
-            [stats.pendingReports,       'Pending Reports', 'text-rust-l'],
-            [stats.pendingExpertRequests,'Expert Requests', 'text-gold'],
-          ].map(([val, label, color]) => (
+            [stats.totalUsers,             stats.newUsersThisWeek,   'Users',           'text-cream'],
+            [stats.totalRecipes,           stats.newRecipesThisWeek, 'Recipes',         'text-cream'],
+            [stats.pendingReports,         null,                     'Pending Reports', 'text-rust-l'],
+            [stats.pendingExpertRequests,  null,                     'Expert Requests', 'text-gold'],
+          ].map(([val, weekVal, label, color]) => (
             <div key={label} className="bg-forest2 border border-[rgba(74,124,89,0.18)] rounded-2xl p-3 text-center">
               <p className={`font-serif text-[22px] font-light ${color}`}>{formatCount(val)}</p>
               <p className="text-[10px] text-muted mt-0.5">{label}</p>
+              {weekVal > 0 && <p className="text-[10px] text-sage-l mt-0.5">+{weekVal} this week</p>}
             </div>
           ))}
         </div>
@@ -199,12 +200,12 @@ export default function AdminPage() {
                         View Profile →
                       </a>
                     )}
-                    <button onClick={() => handleResolveReport(r.id, 'dismiss')}
+                    <button onClick={() => openReportModal(r, 'dismiss')}
                             className="text-[11px] text-muted hover:text-cream border border-[rgba(74,124,89,0.2)]
                                        hover:border-sage px-3 py-1.5 rounded-lg transition-all text-center">
                       Dismiss
                     </button>
-                    <button onClick={() => handleResolveReport(r.id, 'warn')}
+                    <button onClick={() => openReportModal(r, 'warn')}
                             className="text-[11px] text-gold border border-gold/20
                                        hover:border-gold/50 px-3 py-1.5 rounded-lg transition-all text-center">
                       Warn User
@@ -257,17 +258,48 @@ export default function AdminPage() {
                 {/* Application details */}
                 <div className="grid grid-cols-2 gap-3 mb-4">
                   {[
-                    ['Profession',      r.profession],
-                    ['Experience',      r.experience],
-                    ['Qualifications',  r.qualifications],
+                    ['Profession',            r.profession],
+                    ['Experience',            r.experience],
+                    ['Qualifications',        r.qualifications],
+                    r.registrationNumber ? ['Registration No.', r.registrationNumber] : null,
                     r.linkedin ? ['LinkedIn', r.linkedin] : null,
                   ].filter(Boolean).map(([label, value]) => (
                     <div key={label} className="bg-forest rounded-xl px-3 py-2.5">
                       <p className="text-[10px] font-semibold uppercase tracking-wide text-muted mb-1">{label}</p>
-                      <p className="text-[13px] text-cream/85 leading-snug">{value}</p>
+                      {label === 'LinkedIn'
+                        ? <a href={value} target="_blank" rel="noreferrer"
+                             className="text-[13px] text-sage-l hover:text-cream transition-colors truncate block">
+                            {value.replace('https://', '')}
+                          </a>
+                        : <p className="text-[13px] text-cream/85 leading-snug">{value}</p>
+                      }
                     </div>
                   ))}
                 </div>
+                {/* Credential document thumbnail */}
+                {r.credentialURL && (
+                  <div className="mb-4">
+                    <p className="text-[10px] font-semibold uppercase tracking-wide text-muted mb-2">
+                      Uploaded Credential
+                    </p>
+                    {r.credentialURL.includes('.pdf')
+                      ? (
+                        <a href={r.credentialURL} target="_blank" rel="noreferrer"
+                           className="flex items-center gap-2 text-[12px] text-sage-l hover:text-cream
+                                      border border-[rgba(74,124,89,0.25)] px-3 py-2 rounded-xl
+                                      transition-all w-fit">
+                          📄 View PDF credential
+                        </a>
+                      ) : (
+                        <a href={r.credentialURL} target="_blank" rel="noreferrer">
+                          <img src={r.credentialURL} alt="Credential"
+                               className="h-28 rounded-xl border border-[rgba(74,124,89,0.25)]
+                                          object-cover hover:opacity-90 transition-opacity"/>
+                        </a>
+                      )
+                    }
+                  </div>
+                )}
 
                 <div className="flex gap-2">
                   <Button size="sm" onClick={() => handleExpertDecision(r.id, 'approved')}>
@@ -284,6 +316,107 @@ export default function AdminPage() {
       )}
 
       {/* ── USERS ─────────────────────────────────────────────── */}
+      {/* ── ANALYTICS ───────────────────────────────────── */}
+      {activeTab === 'analytics' && stats && (
+        <div className="flex flex-col gap-5">
+
+          {/* Platform summary */}
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(140px,1fr))] gap-3">
+            {[
+              [stats.totalUsers,     'Total Users',     '👤'],
+              [stats.totalRecipes,   'Recipes',         '📖'],
+              [stats.totalMealPlans, 'Meal Plans',      '🥗'],
+              [stats.totalCommunities,'Communities',    '🏘️'],
+              [stats.totalLikes,     'Total Likes',     '❤️'],
+              [stats.totalComments,  'Total Comments',  '💬'],
+            ].map(([val, label, icon]) => (
+              <div key={label} className="bg-forest2 border border-[rgba(74,124,89,0.18)]
+                                          rounded-2xl p-4 text-center">
+                <p className="text-xl mb-1">{icon}</p>
+                <p className="text-[22px] font-semibold text-cream">{val ?? 0}</p>
+                <p className="text-[11px] text-muted mt-0.5">{label}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Most active communities */}
+          {stats.topCommunities?.length > 0 && (
+            <div className="bg-forest2 border border-[rgba(74,124,89,0.18)] rounded-2xl p-5">
+              <p className="text-[12px] font-semibold uppercase tracking-wide text-gold mb-4">
+                Most Active Communities
+              </p>
+              <div className="flex flex-col gap-3">
+                {stats.topCommunities.map((c, i) => (
+                  <div key={c.id} className="flex items-center gap-3">
+                    <span className="text-[13px] text-muted w-4">{i + 1}.</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] text-cream truncate font-medium">{c.name}</p>
+                      <p className="text-[11px] text-muted">{c._count.posts} posts · {c._count.members} members</p>
+                    </div>
+                    <div className="h-1.5 bg-forest3 rounded-full overflow-hidden w-20 flex-shrink-0">
+                      <div className="h-full bg-sage rounded-full"
+                           style={{ width: `${Math.round((c._count.posts / Math.max(stats.topCommunities[0]._count.posts, 1)) * 100)}%` }}/>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Trending recipes */}
+          {stats.topRecipes?.length > 0 && (
+            <div className="bg-forest2 border border-[rgba(74,124,89,0.18)] rounded-2xl p-5">
+              <p className="text-[12px] font-semibold uppercase tracking-wide text-gold mb-4">
+                Trending Recipes This Week
+              </p>
+              <div className="flex flex-col gap-3">
+                {stats.topRecipes.map((r, i) => (
+                  <div key={r.id} className="flex items-center gap-3">
+                    <span className="text-[13px] text-muted w-4">{i + 1}.</span>
+                    {r.imageURL && (
+                      <img src={r.imageURL} alt={r.title}
+                           className="w-9 h-9 rounded-xl object-cover flex-shrink-0 border border-[rgba(74,124,89,0.2)]"/>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] text-cream truncate font-medium">{r.title}</p>
+                      <p className="text-[11px] text-muted">by {r.user?.name}</p>
+                    </div>
+                    <span className="text-[12px] text-gold flex-shrink-0 font-semibold">
+                      ❤ {r._count.likes}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* User growth */}
+          {stats.userGrowth?.length > 0 && (
+            <div className="bg-forest2 border border-[rgba(74,124,89,0.18)] rounded-2xl p-5">
+              <p className="text-[12px] font-semibold uppercase tracking-wide text-gold mb-4">
+                New Users — Last 7 Days
+              </p>
+              <div className="flex items-end gap-2 h-24">
+                {stats.userGrowth.map((d, i) => {
+                  const max = Math.max(...stats.userGrowth.map(x => x.count), 1);
+                  const pct = Math.round((d.count / max) * 100);
+                  return (
+                    <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                      <span className="text-[10px] text-cream">{d.count}</span>
+                      <div className="w-full bg-sage rounded-t-md transition-all"
+                           style={{ height: `${Math.max(pct, 4)}%` }}/>
+                      <span className="text-[9px] text-muted">
+                        {new Date(d.day).toLocaleDateString('en', { weekday: 'short' })}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {activeTab === 'users' && (
         <div>
           <div className="flex items-center gap-3 bg-forest2 border border-[rgba(74,124,89,0.18)]
@@ -327,6 +460,16 @@ export default function AdminPage() {
             ))}
           </div>
         </div>
+      )}
+
+      {/* Report action modal */}
+      {reportModal && (
+        <ReportActionModal
+          report={reportModal.report}
+          action={reportModal.action}
+          onConfirm={handleResolveReport}
+          onClose={() => setReportModal(null)}
+        />
       )}
     </div>
   );

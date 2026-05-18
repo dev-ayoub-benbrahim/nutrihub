@@ -22,13 +22,32 @@ const schema = z.object({
 const CUISINES   = ['Italian','Japanese','Mediterranean','Mexican','Indian','Caribbean','Moroccan','American','French','Chinese','Thai','Middle Eastern'];
 const DIFFICULTIES = ['EASY', 'MEDIUM', 'HARD'];
 
+// Ingredients recognised by the built-in nutrition table
+// If an ingredient isn't in this list, the author can optionally add macros manually
+const KNOWN_INGREDIENTS = [
+  "egg","eggs","chicken breast","chicken","beef","ground beef","salmon","tuna","shrimp",
+  "white rice","brown rice","rice","pasta","oats","bread","potato","sweet potato","quinoa",
+  "lentils","chickpeas","spinach","broccoli","carrot","tomato","onion","garlic","mushroom",
+  "avocado","banana","apple","milk","cheese","yogurt","butter","olive oil","almonds",
+  "peanut butter","honey","flour","sugar","cucumber","lettuce","pepper","corn","peas",
+  "tofu","hummus","couscous","turkey","lamb","cauliflower","kale","pork","cod","cream",
+  "berries","blueberry","strawberry","mango","grapes","lemon","walnuts","chia seeds",
+  "soy sauce","coconut oil","asparagus","celery","eggplant","zucchini","mozzarella",
+  "feta","cheddar","greek yogurt","cottage cheese","orange","cherry tomato","tuna",
+];
+
+function isKnownIngredient(name) {
+  const lower = (name || "").toLowerCase().trim();
+  return KNOWN_INGREDIENTS.some(k => lower.includes(k));
+}
+
 export default function AddRecipePage() {
   const navigate  = useNavigate();
   const location  = useLocation();
   const prefill   = location.state?.prefill || null;
   const [ingredients, setIngredients] = useState(
     prefill?.ingredients?.length > 0
-      ? prefill.ingredients.map(i => ({ name: i.name || '', quantity: String(i.quantity || ''), unit: i.unit || '' }))
+      ? prefill.ingredients.map(i => ({ name: i.name || '', quantity: String(i.quantity || ''), unit: i.unit || '', showManual: false, manualCalories: '', manualProtein: '', manualCarbs: '', manualFat: '' }))
       : [{ name: '', quantity: '', unit: '' }]
   );
   const [steps,       setSteps]       = useState([{ instruction: '' }]);
@@ -265,42 +284,104 @@ export default function AddRecipePage() {
               <PlusIcon /> Add
             </button>
           </div>
-          <div className="flex flex-col gap-2.5">
-            {ingredients.map((ing, i) => (
-              <div key={i} className="flex gap-2 items-start">
-                <input
-                  value={ing.name}
-                  onChange={e => updateIngredient(i, 'name', e.target.value)}
-                  placeholder="Ingredient name"
-                  className="flex-1 bg-forest border border-[rgba(74,124,89,0.25)] rounded-[10px]
-                             px-3 py-2 text-cream text-sm placeholder:text-muted outline-none
-                             focus:border-sage transition-colors duration-200"
-                />
-                <input
-                  value={ing.quantity}
-                  onChange={e => updateIngredient(i, 'quantity', e.target.value)}
-                  placeholder="Qty"
-                  type="number"
-                  className="w-16 bg-forest border border-[rgba(74,124,89,0.25)] rounded-[10px]
-                             px-3 py-2 text-cream text-sm placeholder:text-muted outline-none
-                             focus:border-sage transition-colors duration-200"
-                />
-                <input
-                  value={ing.unit}
-                  onChange={e => updateIngredient(i, 'unit', e.target.value)}
-                  placeholder="Unit"
-                  className="w-20 bg-forest border border-[rgba(74,124,89,0.25)] rounded-[10px]
-                             px-3 py-2 text-cream text-sm placeholder:text-muted outline-none
-                             focus:border-sage transition-colors duration-200"
-                />
-                {ingredients.length > 1 && (
-                  <button type="button" onClick={() => removeIngredient(i)}
-                          className="text-muted hover:text-red-400 transition-colors pt-2">
-                    <RemoveIcon />
-                  </button>
-                )}
-              </div>
-            ))}
+          <div className="flex flex-col gap-3">
+            {ingredients.map((ing, i) => {
+              const known    = isKnownIngredient(ing.name);
+              const showHint = ing.name.trim().length > 2 && !known;
+              return (
+                <div key={i} className="flex flex-col gap-1.5">
+                  {/* Main ingredient row */}
+                  <div className="flex gap-2 items-start">
+                    <input
+                      value={ing.name}
+                      onChange={e => updateIngredient(i, 'name', e.target.value)}
+                      placeholder="Ingredient name"
+                      className="flex-1 bg-forest border border-[rgba(74,124,89,0.25)] rounded-[10px]
+                                 px-3 py-2 text-cream text-sm placeholder:text-muted outline-none
+                                 focus:border-sage transition-colors duration-200"
+                    />
+                    <input
+                      value={ing.quantity}
+                      onChange={e => updateIngredient(i, 'quantity', e.target.value)}
+                      placeholder="Qty"
+                      type="number"
+                      className="w-16 bg-forest border border-[rgba(74,124,89,0.25)] rounded-[10px]
+                                 px-3 py-2 text-cream text-sm placeholder:text-muted outline-none
+                                 focus:border-sage transition-colors duration-200"
+                    />
+                    <input
+                      value={ing.unit}
+                      onChange={e => updateIngredient(i, 'unit', e.target.value)}
+                      placeholder="Unit"
+                      className="w-20 bg-forest border border-[rgba(74,124,89,0.25)] rounded-[10px]
+                                 px-3 py-2 text-cream text-sm placeholder:text-muted outline-none
+                                 focus:border-sage transition-colors duration-200"
+                    />
+                    {ingredients.length > 1 && (
+                      <button type="button" onClick={() => removeIngredient(i)}
+                              className="text-muted hover:text-red-400 transition-colors pt-2">
+                        <RemoveIcon />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Manual nutrition prompt — only for unrecognised ingredients */}
+                  {showHint && (
+                    <div className="ml-1">
+                      {!ing.showManual ? (
+                        <button
+                          type="button"
+                          onClick={() => updateIngredient(i, 'showManual', true)}
+                          className="text-[11px] text-gold/70 hover:text-gold transition-colors
+                                     flex items-center gap-1.5"
+                        >
+                          <span className="text-[10px]">⚠</span>
+                          "{ing.name}" not in our database — add nutrition manually (optional)
+                        </button>
+                      ) : (
+                        <div className="bg-[rgba(212,168,67,0.06)] border border-gold/20
+                                        rounded-xl p-3 flex flex-col gap-2">
+                          <div className="flex items-center justify-between">
+                            <p className="text-[11px] font-semibold text-gold uppercase tracking-wide">
+                              Manual nutrition per 100g — author estimate
+                            </p>
+                            <button type="button"
+                                    onClick={() => updateIngredient(i, 'showManual', false)}
+                                    className="text-muted hover:text-cream text-sm">×</button>
+                          </div>
+                          <p className="text-[10px] text-muted leading-relaxed">
+                            These values will only apply to this recipe and are labelled as author
+                            estimates. They are never shared with other recipes.
+                          </p>
+                          <div className="grid grid-cols-4 gap-2">
+                            {[
+                              ['manualCalories', 'Calories', 'kcal'],
+                              ['manualProtein',  'Protein',  'g'],
+                              ['manualCarbs',    'Carbs',    'g'],
+                              ['manualFat',      'Fat',      'g'],
+                            ].map(([field, label, unit]) => (
+                              <div key={field} className="flex flex-col gap-1">
+                                <label className="text-[10px] text-muted">{label} ({unit})</label>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={ing[field]}
+                                  onChange={e => updateIngredient(i, field, e.target.value)}
+                                  placeholder="0"
+                                  className="w-full bg-forest border border-gold/20 rounded-lg
+                                             px-2 py-1.5 text-cream text-sm placeholder:text-muted
+                                             outline-none focus:border-gold/50 transition-colors"
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
 
