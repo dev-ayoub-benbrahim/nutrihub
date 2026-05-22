@@ -85,7 +85,7 @@ export const updateProfile = async (req, res) => {
   try {
     const { name, bio, calorieTarget, goal, restrictions, specialisation, cuisinePrefs } = req.body;
 
-    const validGoals = ["LOSE_WEIGHT", "MAINTAIN", "BUILD_MUSCLE", "EAT_HEALTHIER"];
+    const validGoals = ["LOSE_WEIGHT", "MAINTAIN", "BUILD_MUSCLE", "EAT_HEALTHIER", "HIGH_ENERGY"];
     if (goal && !validGoals.includes(goal))
       return res.status(400).json({ message: `Invalid goal. Must be one of: ${validGoals.join(", ")}` });
 
@@ -132,7 +132,7 @@ export const deleteAccount = async (req, res) => {
 };
 
 // ── PUT /api/auth/password ────────────────────────────────────
-// Change password — requires current password for verification.
+// Change password 
 export const changePassword = async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
@@ -167,7 +167,7 @@ export const changePassword = async (req, res) => {
 };
 
 // ── PUT /api/auth/email ───────────────────────────────────────
-// Change email — requires password verification.
+// Change email 
 export const changeEmail = async (req, res) => {
   try {
     const { newEmail, password } = req.body;

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../utils/axios';
-import ReportActionModal from '../../components/reportmodal.jsx';
+import ReportActionModal from '../../components/ReportActionModal';
 import { useAuth } from '../../hooks/useAuth';
 import { getInitials, getErrorMessage, formatCount } from '../../utils/helpers';
 import Button from '../../components/ui/Button';

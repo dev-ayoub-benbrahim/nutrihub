@@ -72,7 +72,7 @@ model User {
   @@map("users")
 }
 
-// ── Recipes ───────────────────────────────────────────────────
+// Recipes 
 
 model Recipe {
   id          Int        @id @default(autoincrement())
@@ -84,8 +84,6 @@ model Recipe {
   difficulty  Difficulty @default(EASY)
   cuisine     String?
   isPublished Boolean    @default(true)
-  // Optional user-provided nutrition estimates per serving
-  // USDA ingredient data takes precedence when available
   caloriesPerServing Float?
   proteinPerServing  Float?
   carbsPerServing    Float?
@@ -117,9 +115,8 @@ model RecipeIngredient {
   ingredient   Ingredient @relation(fields: [ingredientId], references: [id])
   quantity     Float
   unit         String
-  // Manual nutrition entry — recipe-scoped, never shared to other recipes
   // Only used when ingredient is not found in the built-in nutrition table
-  manualCalories Float?   // kcal per 100g, author estimate
+  manualCalories Float?   // kcal per 100g
   manualProtein  Float?   // g per 100g
   manualCarbs    Float?   // g per 100g
   manualFat      Float?   // g per 100g
@@ -146,7 +143,7 @@ model RecipeTag {
   @@map("recipe_tags")
 }
 
-// ── Ingredients ───────────────────────────────────────────────
+//  Ingredients 
 
 model Ingredient {
   id              Int     @id @default(autoincrement())
@@ -163,7 +160,7 @@ model Ingredient {
   @@map("ingredients")
 }
 
-// ── Social ────────────────────────────────────────────────────
+// Social 
 
 model Like {
   id        Int      @id @default(autoincrement())
@@ -213,7 +210,7 @@ model Follow {
   @@map("follows")
 }
 
-// ── Communities ───────────────────────────────────────────────
+// Communities
 
 model Community {
   id          Int      @id @default(autoincrement())
@@ -268,7 +265,7 @@ model CommunityPost {
   userId      Int
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   content     String
-  imageURL    String?    // optional photo
+  imageURL    String?    
   postType    String     @default("question")  // question | log | draft
   ingredients Json?      // only for draft type: [{name,quantity,unit}]
   createdAt   DateTime   @default(now())
@@ -291,7 +288,7 @@ model CommunityPostComment {
   @@map("community_post_comments")
 }
 
-// ── Meal Planning ─────────────────────────────────────────────
+// Meal Planning 
 
 model MealPlan {
   id            Int      @id @default(autoincrement())
@@ -365,11 +362,11 @@ model MealLog {
   carbsG     Float
   fatG       Float
 
-  @@unique([userId, mealId])  // one log per meal ever — prevents all duplicates
+  @@unique([userId, mealId])  // prevents all duplicates
   @@map("meal_logs")
 }
 
-// ── Notifications ─────────────────────────────────────────────
+// Notifications 
 
 model Notification {
   id        Int      @id @default(autoincrement())
@@ -384,7 +381,7 @@ model Notification {
   @@map("notifications")
 }
 
-// ── Reports ───────────────────────────────────────────────────
+// Reports 
 
 model Report {
   id             Int      @id @default(autoincrement())
@@ -402,7 +399,7 @@ model Report {
   @@map("reports")
 }
 
-// Dedicated expert verification requests — separate from reports
+// Dedicated expert verification requests 
 model ExpertRequest {
   id                 Int      @id @default(autoincrement())
   userId             Int
@@ -420,7 +417,7 @@ model ExpertRequest {
   @@map("expert_requests")
 }
 
-// Expert annotation on a recipe — only verified experts can add these
+// Expert annotation on a recipe 
 model ExpertNote {
   id        Int      @id @default(autoincrement())
   recipeId  Int
@@ -435,7 +432,7 @@ model ExpertNote {
   @@map("expert_notes")
 }
 
-// Verified answer on a community post comment — expert marks their reply
+// Verified answer on a community post comment 
 model VerifiedAnswer {
   id        Int      @id @default(autoincrement())
   postId    Int      @unique // one verified answer per post

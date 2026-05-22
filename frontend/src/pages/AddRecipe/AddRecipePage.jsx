@@ -130,9 +130,13 @@ export default function AddRecipePage() {
 
       fd.append('ingredients', JSON.stringify(
         validIngredients.map(i => ({
-          name:     i.name.trim(),
-          quantity: parseFloat(i.quantity) || 1,
-          unit:     i.unit.trim() || 'piece',
+          name:           i.name.trim(),
+          quantity:       parseFloat(i.quantity) || 1,
+          unit:           i.unit.trim() || 'piece',
+          ...(i.manualCalories !== '' && i.manualCalories != null && { manualCalories: parseFloat(i.manualCalories) }),
+          ...(i.manualProtein  !== '' && i.manualProtein  != null && { manualProtein:  parseFloat(i.manualProtein)  }),
+          ...(i.manualCarbs    !== '' && i.manualCarbs    != null && { manualCarbs:    parseFloat(i.manualCarbs)    }),
+          ...(i.manualFat      !== '' && i.manualFat      != null && { manualFat:      parseFloat(i.manualFat)      }),
         }))
       ));
 
@@ -309,14 +313,36 @@ export default function AddRecipePage() {
                                  px-3 py-2 text-cream text-sm placeholder:text-muted outline-none
                                  focus:border-sage transition-colors duration-200"
                     />
-                    <input
+                    <select
                       value={ing.unit}
                       onChange={e => updateIngredient(i, 'unit', e.target.value)}
-                      placeholder="Unit"
-                      className="w-20 bg-forest border border-[rgba(74,124,89,0.25)] rounded-[10px]
-                                 px-3 py-2 text-cream text-sm placeholder:text-muted outline-none
-                                 focus:border-sage transition-colors duration-200"
-                    />
+                      className="w-24 bg-forest border border-[rgba(74,124,89,0.25)] rounded-[10px]
+                                 px-2 py-2 text-cream text-sm outline-none
+                                 focus:border-sage transition-colors duration-200 cursor-pointer
+                                 appearance-none bg-no-repeat"
+                      style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238aab94' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center', paddingRight: '28px' }}
+                    >
+                      <option value="">Unit</option>
+                      <optgroup label="Weight">
+                        <option value="g">g — gram</option>
+                        <option value="kg">kg — kilogram</option>
+                        <option value="oz">oz — ounce</option>
+                        <option value="lb">lb — pound</option>
+                      </optgroup>
+                      <optgroup label="Volume">
+                        <option value="ml">ml — millilitre</option>
+                        <option value="l">l — litre</option>
+                        <option value="tsp">tsp — teaspoon</option>
+                        <option value="tbsp">tbsp — tablespoon</option>
+                        <option value="cup">cup</option>
+                      </optgroup>
+                      <optgroup label="Countable">
+                        <option value="piece">piece</option>
+                        <option value="slice">slice</option>
+                        <option value="clove">clove</option>
+                        <option value="pinch">pinch</option>
+                      </optgroup>
+                    </select>
                     {ingredients.length > 1 && (
                       <button type="button" onClick={() => removeIngredient(i)}
                               className="text-muted hover:text-red-400 transition-colors pt-2">

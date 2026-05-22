@@ -124,54 +124,49 @@ export const getReports = async (req, res) => {
 export const resolveReport = async (req, res) => {
   try {
     const { action, adminMessage } = req.body;
-    // action: "dismiss" | "warn" | "delete"
+
+    if (!["dismiss", "warn", "delete"].includes(action)) {
+      return res.status(400).json({ message: "Invalid action. Must be dismiss, warn, or delete." });
+    }
 
     const report = await prisma.report.findUnique({
       where:   { id: parseInt(req.params.id) },
       include: {
-        reporter: { select: { id: true } },
-        recipe:   { select: { id: true, title: true, userId: true } },
+        reporter:     { select: { id: true } },
+        recipe:       { select: { id: true, title: true, userId: true } },
+
       },
     });
     if (!report) return res.status(404).json({ message: "Report not found" });
 
+    const contentTitle = report.recipe?.title || "this content";
+    const contentLink  = report.recipe?.id ? `/recipes/${report.recipe.id}` : "/";
+
     // Update report status
     await prisma.report.update({
       where: { id: report.id },
-      data:  { resolved: true, resolvedNote: adminMessage || action || null },
+      data:  { resolved: true, resolvedNote: adminMessage || action },
     });
 
-    // Notify the reporter of the outcome
+    // Notify the reporter
     if (report.reporterId) {
-      const reporterMsg = action === "delete"
-        ? `Your report on "${report.recipe?.title || "content"}" has been reviewed. The content has been removed for violating community guidelines.`
-        : action === "warn"
-        ? `Your report on "${report.recipe?.title || "content"}" has been reviewed. The content owner has been warned.`
-        : `Your report on "${report.recipe?.title || "content"}" has been reviewed. No violation was found — thank you for helping keep the community safe.`;
-
+      const reporterMsg =
+        action === "delete" ? `Your report on "${contentTitle}" has been reviewed. The content has been removed.`
+        : action === "warn"  ? `Your report on "${contentTitle}" has been reviewed. The content owner has been warned.`
+        :                      `Your report on "${contentTitle}" has been reviewed. No violation was found — thank you for helping keep the community safe.`;
       await prisma.notification.create({
-        data: {
-          userId:  report.reporterId,
-          type:    "report_resolved",
-          message: reporterMsg,
-          link:    report.recipe?.id ? `/recipes/${report.recipe.id}` : "/",
-        },
+        data: { userId: report.reporterId, type: "report_resolved", message: reporterMsg, link: contentLink },
       });
     }
 
     // Notify the content owner if action was taken
-    if (report.recipe?.userId && (action === "delete" || action === "warn")) {
+    const ownerId = report.recipe?.userId || report.reportedUserId;
+    if (ownerId && (action === "delete" || action === "warn")) {
       const ownerMsg = action === "delete"
-        ? `Your recipe "${report.recipe.title}" has been removed following a community report. ${adminMessage ? "Reason: " + adminMessage : "It was found to violate community guidelines."}`
-        : `Your recipe "${report.recipe.title}" has received a warning following a community report. ${adminMessage ? "Note: " + adminMessage : "Please review our community guidelines."}`;
-
+        ? `Your content "${contentTitle}" has been removed following a community report.${adminMessage ? " Reason: " + adminMessage : ""}`
+        : `Your content "${contentTitle}" has received a warning following a community report.${adminMessage ? " Note: " + adminMessage : ""}`;
       await prisma.notification.create({
-        data: {
-          userId:  report.recipe.userId,
-          type:    "content_moderated",
-          message: ownerMsg,
-          link:    `/recipes/${report.recipe.id}`,
-        },
+        data: { userId: ownerId, type: "content_moderated", message: ownerMsg, link: contentLink },
       });
     }
 
@@ -183,7 +178,7 @@ export const resolveReport = async (req, res) => {
     res.json({ message: "Report resolved and notifications sent" });
   } catch (error) {
     console.error("resolveReport error:", error);
-    res.status(500).json({ message: "Server error" });
+    res.status(500).json({ message: "Server error", detail: error.message });
   }
 };
 

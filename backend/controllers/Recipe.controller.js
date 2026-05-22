@@ -441,7 +441,17 @@ export const getRecipeById = async (req, res) => {
       orderBy: { createdAt: "desc" },
     });
 
-    res.json({ ...recipe, relatedRecipes, isLiked, isSaved });
+    // Annotate each ingredient with isBuiltIn so the frontend can show the correct badge
+    const annotatedIngredients = recipe.ingredients.map(ri => ({
+      ...ri,
+      isBuiltIn: !!calcIngredientMacros(
+        ri.ingredient?.name || '',
+        ri.quantity,
+        ri.unit
+      ),
+    }));
+
+    res.json({ ...recipe, ingredients: annotatedIngredients, relatedRecipes, isLiked, isSaved });
   } catch (error) {
     console.error("getRecipeById error:", error);
     res.status(500).json({ message: "Server error" });

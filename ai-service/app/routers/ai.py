@@ -14,10 +14,6 @@ from app.services.usda import get_usda_nutrients, calculate_contribution
 router = APIRouter(prefix="/ai", tags=["AI Pipeline"])
 
 # Tolerance threshold for the output validator.
-# If any day's total calories deviates more than this from the target,
-# a warning is added to the response but the plan is still returned.
-# 25% is forgiving enough for practical meal plans while still flagging
-# significant mismatches for the evaluation chapter.
 CALORIE_TOLERANCE_PCT = 0.25
 
 
@@ -51,23 +47,8 @@ async def parse_input(body: ParseInputRequest):
     summary="Full pipeline — parse → generate → USDA validate → output validate",
 )
 async def generate_plan(body: ParseInputRequest):
-    """
-    Full three-stage pipeline in one call.
 
-    Stage 1: Parse natural language → ParsedInput (structured JSON)
-    Stage 2: GPT-4o → 21-meal plan with LLM nutritional estimates
-    Stage 3: USDA FoodData Central → validate/replace LLM estimates
-    Stage 4: Output validator → flag days where calories deviate >25% from target
 
-    The allergy field is enforced at both the parse stage (GPT extracts it)
-    and the generation stage (injected as a hard constraint into the prompt).
-    """
-
-    # ── Stage 1+2 merged: Build ParsedInput directly, skip LLM parse ──
-    # The frontend already sends structured data (goal, calorie target,
-    # dietary preferences) as a formatted string. We extract the calorie
-    # target with a simple regex rather than a second GPT-4o call.
-    # This saves 1-3 seconds on every generation.
     import re as _re
     calorie_match = _re.search(r"(\d{3,5})\s*kcal", body.text)
     calorie_target = int(calorie_match.group(1)) if calorie_match else 2000
@@ -110,8 +91,7 @@ async def generate_plan(body: ParseInputRequest):
         traceback.print_exc()  # prints full error to uvicorn console
         raise HTTPException(status_code=422, detail=f"Meal plan generation failed: {str(e)}")
 
-    # ── Stage 3: USDA validation ─────────────────────────────────
-    # Note: automatic retry removed — it doubled worst-case generation time.
+    # ── Stage 3: USDA validation 
     # Calorie warnings are shown to the user via Stage 4 instead.
     # Collect unique ingredient names, fetch USDA data in parallel
     unique_ingredients: set[str] = set()
@@ -120,8 +100,6 @@ async def generate_plan(body: ParseInputRequest):
             unique_ingredients.add(ing.name.lower().strip())
 
     ingredient_names = list(unique_ingredients)
-    # Wrap each lookup in a timeout — DEMO_KEY (30 req/hr) can hang
-    # silently. 3s per lookup is generous; our built-in table returns in <1ms.
     async def safe_lookup(name: str):
         try:
             return await asyncio.wait_for(get_usda_nutrients(name), timeout=3.0)
@@ -164,7 +142,7 @@ async def generate_plan(body: ParseInputRequest):
                     usda_fdc_id=contributed.usda_fdc_id, usda_matched=True,
                 ))
             else:
-                # Three-tier lookup failed — use LLM estimates as final fallback
+                # Three-tier lookup failed use LLM estimates as final fallback
                 if key not in unmatched:
                     unmatched.append(ing.name)
                 llm_cal  = ing.llm_calories  or 0
@@ -200,11 +178,8 @@ async def generate_plan(body: ParseInputRequest):
             usda_total_fat_g=round(usda_total_fat,   1),
         ))
 
-    # ── Stage 4: Output validator ────────────────────────────────
-    # The supervisor specifically requested this step.
-    # Groups meals by day, sums USDA calories, compares to target.
-    # A warning is generated for any day that deviates > CALORIE_TOLERANCE_PCT.
-    # The plan is still returned — warnings are informational, not blocking.
+    # ── Stage 4: Output validator 
+    # Groups meals, sums USDA calories, compares to target.
     validation_warnings: list[ValidationWarning] = []
 
     if parsed.calorie_target and parsed.calorie_target > 0:

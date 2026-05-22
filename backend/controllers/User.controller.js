@@ -19,7 +19,7 @@ export const getUserById = async (req, res) => {
         specialisation: true,
         goal:           true,
         createdAt:      true,
-        // intentionally exclude: email, password, restrictions, calorieTarget
+        // exclude: email, password, restrictions, calorieTarget
       },
     });
 
@@ -33,7 +33,7 @@ export const getUserById = async (req, res) => {
 };
 
 // ── GET /api/users/search?q=term ─────────────────────────────
-// Search users by name — for the people search feature.
+// Search users by name
 export const searchUsers = async (req, res) => {
   try {
     const { q, limit = 10 } = req.query;
@@ -67,9 +67,8 @@ export const searchUsers = async (req, res) => {
 // ── GET /api/users/suggested ──────────────────────────────────
 // Returns suggested users to follow, ordered by:
 //   1. Verified experts first
-//   2. Most followers (most credible/popular)
+//   2. Most followers 
 //   3. Exclude users the current user already follows
-// Supports ?filter=experts|new for the People page tabs.
 export const getSuggestedUsers = async (req, res) => {
   try {
     const currentUserId = req.user?.id;

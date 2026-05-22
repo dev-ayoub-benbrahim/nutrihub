@@ -10,6 +10,7 @@ import { getErrorMessage, getInitials } from '../../utils/helpers';
 import Input from '../../components/ui/Input';
 import Button from '../../components/ui/Button';
 import ExpertVerificationModal from '../../components/ExpertVerificationModal';
+import ConfirmModal from '../../components/ConfirmModal';
 
 const schema = z.object({
   name:           z.string().min(2, 'Name must be at least 2 characters'),
@@ -20,10 +21,11 @@ const schema = z.object({
 });
 
 const GOALS = [
-  { value: 'LOSE_WEIGHT',   label: 'Lose weight'     },
-  { value: 'MAINTAIN',      label: 'Maintain weight' },
-  { value: 'BUILD_MUSCLE',  label: 'Build muscle'    },
-  { value: 'EAT_HEALTHIER', label: 'Eat healthier'   },
+  { value: 'LOSE_WEIGHT',   label: 'Lose Weight',    emoji: '🔥', desc: 'Calorie deficit' },
+  { value: 'MAINTAIN',      label: 'Maintain Weight',emoji: '⚖️', desc: 'Steady balance' },
+  { value: 'BUILD_MUSCLE',  label: 'Build Muscle',   emoji: '💪', desc: 'Calorie surplus' },
+  { value: 'EAT_HEALTHIER', label: 'Eat Healthier',  emoji: '🥗', desc: 'Clean eating'   },
+  { value: 'HIGH_ENERGY',   label: 'High Energy',    emoji: '⚡', desc: 'High carb fuel'  },
 ];
 
 export default function EditProfilePage() {
@@ -35,6 +37,7 @@ export default function EditProfilePage() {
   const [submitting,      setSubmitting]      = useState(false);
   const [showExpertModal, setShowExpertModal] = useState(false);
   const [deletingAccount,  setDeletingAccount]  = useState(false);
+  const [showDeleteModal,  setShowDeleteModal]  = useState(false);
   const [showPassForm,     setShowPassForm]     = useState(false);
   const [showEmailForm,    setShowEmailForm]    = useState(false);
   const [passData,         setPassData]         = useState({ current: '', newPass: '', confirm: '' });
@@ -42,7 +45,7 @@ export default function EditProfilePage() {
   const [savingPass,       setSavingPass]       = useState(false);
   const [savingEmail,      setSavingEmail]      = useState(false);
 
-  const { register, handleSubmit, formState: { errors } } = useForm({
+  const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm({
     resolver: zodResolver(schema),
     defaultValues: {
       name:           user?.name           || '',
@@ -120,20 +123,6 @@ export default function EditProfilePage() {
   };
 
   const handleDeleteAccount = async () => {
-    const confirmed = window.confirm(
-      'Are you sure you want to permanently delete your account?\n\n' +
-      'This will delete:\n' +
-      '• All your recipes\n' +
-      '• Your followers and following\n' +
-      '• Your meal plans\n' +
-      '• All your activity\n\n' +
-      'This action CANNOT be undone.'
-    );
-    if (!confirmed) return;
-
-    const typed = window.prompt('Type DELETE to confirm:');
-    if (typed !== 'DELETE') { toast.error('Account deletion cancelled'); return; }
-
     setDeletingAccount(true);
     try {
       await api.delete('/auth/me');
@@ -218,20 +207,29 @@ export default function EditProfilePage() {
           )}
         </div>
 
-        {/* Nutrition goals */}
-        <div className="bg-forest2 border border-[rgba(74,124,89,0.18)] rounded-2xl p-5 flex flex-col gap-4">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.5px] text-gold">Nutrition Goals</p>
-          <div className="flex flex-col gap-1.5">
-            <label className="text-[11px] font-semibold uppercase tracking-[0.5px] text-muted">Goal</label>
-            <select {...register('goal')}
-                    className="bg-forest border border-[rgba(74,124,89,0.25)] rounded-[10px]
-                               px-3.5 py-2.5 text-cream text-sm outline-none focus:border-sage transition-colors">
-              <option value="">Select a goal</option>
-              {GOALS.map(g => <option key={g.value} value={g.value}>{g.label}</option>)}
-            </select>
+        {/* Nutrition goal */}
+        <div className="bg-forest2 border border-[rgba(74,124,89,0.18)] rounded-2xl p-5">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.5px] text-gold mb-3">Health Goal</p>
+          <div className="grid grid-cols-2 gap-2">
+            {GOALS.map(g => {
+              const current = watch('goal');
+              return (
+                <button key={g.value} type="button"
+                        onClick={() => setValue('goal', g.value)}
+                        className={`flex items-center gap-2.5 px-3 py-3 rounded-xl border text-left transition-all
+                                    ${current === g.value
+                                      ? 'border-sage/50 bg-[rgba(74,124,89,0.14)] text-cream'
+                                      : 'border-[rgba(74,124,89,0.15)] text-muted hover:border-sage/30 hover:text-cream'}`}>
+                  <span className="text-xl flex-shrink-0">{g.emoji}</span>
+                  <div>
+                    <p className="text-[13px] font-medium leading-tight">{g.label}</p>
+                    <p className="text-[10px] text-muted leading-tight">{g.desc}</p>
+                  </div>
+                  {current === g.value && <span className="ml-auto text-sage text-sm">✓</span>}
+                </button>
+              );
+            })}
           </div>
-          <Input label="Daily Calorie Target" type="number" placeholder="e.g. 1800"
-                 {...register('calorieTarget')}/>
         </div>
 
         {/* Expert verification */}
@@ -264,8 +262,10 @@ export default function EditProfilePage() {
           </Button>
         </div>
 
-        {/* Account Settings */}
-        <div className="bg-forest2 border border-[rgba(74,124,89,0.18)] rounded-2xl overflow-hidden">
+      </form>
+
+      {/* Account Settings — outside main form */}
+      <div className="bg-forest2 border border-[rgba(74,124,89,0.18)] rounded-2xl overflow-hidden mt-5">
           <div className="px-5 py-3 border-b border-[rgba(74,124,89,0.12)]">
             <p className="text-[11px] font-semibold uppercase tracking-[0.5px] text-gold">Account Settings</p>
           </div>
@@ -365,21 +365,30 @@ export default function EditProfilePage() {
         </div>
 
         {/* Danger zone */}
-        <div className="border border-red-500/20 rounded-2xl p-5 mb-8">
+        <div className="border border-red-500/20 rounded-2xl p-5 mb-8 mt-6">
           <p className="text-[12px] font-semibold uppercase tracking-wide text-red-400 mb-1">
             Danger Zone
           </p>
           <p className="text-[13px] text-muted mb-4">
             Permanently delete your account and all associated data. This action cannot be undone.
           </p>
-          <button type="button" onClick={handleDeleteAccount} disabled={deletingAccount}
+          <button type="button" onClick={() => setShowDeleteModal(true)}
                   className="text-[13px] text-red-400 hover:text-red-300 border border-red-500/30
                              hover:border-red-400/50 px-4 py-2 rounded-xl transition-all disabled:opacity-50">
-            {deletingAccount ? 'Deleting…' : 'Delete my account permanently'}
+            Delete my account permanently
           </button>
         </div>
 
-      </form>
+      <ConfirmModal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={handleDeleteAccount}
+        title="Delete your account"
+        message="This will permanently delete all your recipes, meal plans, followers, and activity. This action cannot be undone."
+        confirmLabel="Delete account"
+        danger
+        requireType="DELETE"
+      />
 
       {/* ExpertVerificationModal — outside form, inside root div */}
       <ExpertVerificationModal

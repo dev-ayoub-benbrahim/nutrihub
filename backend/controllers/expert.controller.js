@@ -1,6 +1,5 @@
 import prisma from "../lib/prisma.js";
 
-// ── Middleware guard (applied at route level) ─────────────────
 // All routes here require protect + restrictTo("EXPERT","ADMIN")
 
 // ── GET /api/expert/recipes/:recipeId/note ────────────────────
@@ -94,7 +93,7 @@ export const markVerifiedAnswer = async (req, res) => {
     if (comment.userId !== req.user.id)
       return res.status(403).json({ message: "You can only verify your own answers" });
 
-    // Upsert — only one verified answer per post
+    // only one verified answer per post
     const answer = await prisma.verifiedAnswer.upsert({
       where:  { postId },
       create: { postId, commentId, expertId: req.user.id },

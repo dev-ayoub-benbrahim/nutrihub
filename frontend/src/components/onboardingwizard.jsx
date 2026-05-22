@@ -2,6 +2,7 @@ import { useState } from 'react';
 import api from '../utils/axios';
 import { getErrorMessage } from '../utils/helpers';
 import toast from 'react-hot-toast';
+import { useAuth } from '../hooks/useAuth';
 
 const GOALS = [
   { value: 'LOSE_WEIGHT',   label: 'Lose Weight',     emoji: '🔥', desc: 'Calorie deficit, high protein' },
@@ -22,6 +23,7 @@ const RESTRICTIONS = [
 ];
 
 export default function OnboardingWizard({ onComplete }) {
+  const { updateUser } = useAuth(); 
   const [step,         setStep]         = useState(1); // 1 | 2 | 3
   const [goal,         setGoal]         = useState('');
   const [cuisines,     setCuisines]     = useState([]);
@@ -32,20 +34,21 @@ export default function OnboardingWizard({ onComplete }) {
   const toggleRestriction = (r) => setRestrictions(p => p.includes(r) ? p.filter(x => x !== r) : [...p, r]);
 
   const handleFinish = async () => {
-    setSaving(true);
-    try {
-      await api.put('/auth/me', {
-        ...(goal         && { goal }),
-        ...(cuisines.length  && { cuisinePrefs: cuisines }),
-        ...(restrictions.length && { restrictions }),
-      });
-      onComplete();
-    } catch (err) {
-      toast.error(getErrorMessage(err));
-    } finally {
-      setSaving(false);
-    }
-  };
+  setSaving(true);
+  try {
+    const { data } = await api.put('/auth/me', {
+      ...(goal              && { goal }),
+      ...(cuisines.length   && { cuisinePrefs: cuisines }),
+      ...(restrictions.length && { restrictions }),
+    });
+    updateUser(data);   // update React context so UI reflects changes immediately
+    onComplete();
+  } catch (err) {
+    toast.error(getErrorMessage(err));
+  } finally {
+    setSaving(false);
+  }
+};
 
   const STEPS = [
     { number: 1, label: 'Your goal'   },

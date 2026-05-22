@@ -116,7 +116,7 @@ export default function DashboardPage() {
               </span>
             )}
           </div>
-          {/* One expert indicator — inline, shows profession */}
+          {/* One expert indicator */}
           {user.role === 'EXPERT' && (
             <div className="mt-2 inline-flex items-center gap-2 bg-[rgba(212,168,67,0.08)]
                             border border-gold/25 rounded-xl px-3.5 py-2">
@@ -206,8 +206,8 @@ export default function DashboardPage() {
         <div className="bg-forest2 border border-[rgba(74,124,89,0.18)] rounded-2xl p-5 mb-5">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <p className="text-[13px] font-semibold text-cream">Meal Plan Progress</p>
-              <p className="text-[11px] text-muted">Calories logged per plan day vs {calorieTarget} kcal target</p>
+              <p className="text-[13px] font-semibold text-cream">Weekly Calorie Tracking</p>
+              <p className="text-[11px] text-muted">Calories logged per day vs {calorieTarget} kcal target</p>
             </div>
             <span className="text-[11px] text-muted bg-forest px-2 py-1 rounded-lg border border-[rgba(74,124,89,0.2)]">kcal/day</span>
           </div>
@@ -231,7 +231,7 @@ export default function DashboardPage() {
             </BarChart>
           </ResponsiveContainer>
           <p className="text-[10px] text-muted mt-2 text-center">
-            Each bar shows calories logged for that plan day. Unlogged days show as empty.
+            Each bar shows calories logged that day. Days with no logged meals show as empty.
           </p>
         </div>
       )}

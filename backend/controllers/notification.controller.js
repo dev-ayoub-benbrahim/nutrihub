@@ -1,7 +1,5 @@
 import prisma from "../lib/prisma.js";
 
-// ── Helper — call this from other controllers to fire a notification ──
-// Usage: await createNotification(tx_or_prisma, { userId, type, message, link })
 export const createNotification = async (db, { userId, type, message, link }) => {
   try {
     await db.notification.create({

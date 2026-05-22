@@ -22,15 +22,17 @@ export default function ReportModal({ isOpen, onClose, recipeId, reportedUserId,
       await api.post('/reports', {
         category,
         reason: reason.trim(),
-        ...(recipeId       && { recipeId }),
-        ...(reportedUserId && { reportedUserId }),
-      });
+        ...(recipeId       && { recipeId: parseInt(recipeId) }),
+        ...(reportedUserId && { reportedUserId: parseInt(reportedUserId) }),
+      }, { timeout: 8000 });
       toast.success('Report submitted — our team will review it');
       setReason('');
       setCategory('Other');
       onClose();
     } catch (err) {
-      toast.error(err?.response?.data?.message || 'Failed to submit report');
+      const msg = err?.response?.data?.message || 'Failed to submit report';
+      toast.error(msg, { duration: 4000 });
+      console.error('Report error:', err?.response?.status, msg);
     } finally {
       setLoading(false);
     }

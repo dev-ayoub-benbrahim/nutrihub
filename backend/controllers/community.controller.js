@@ -114,7 +114,7 @@ export const getCommunityRecipes = async (req, res) => {
 };
 
 // ── POST /api/communities/:id/recipes ────────────────────────
-// Share a recipe into the community — must be a member
+// Share a recipe into the community must be a member
 export const shareRecipeToCommunity = async (req, res) => {
   try {
     const communityId = parseInt(req.params.id);
@@ -361,7 +361,7 @@ export const leaveCommunity = async (req, res) => {
     if (!community) return res.status(404).json({ message: "Community not found" });
 
     if (community.creatorId === req.user.id)
-      return res.status(400).json({ message: "Creators cannot leave — delete the community instead" });
+      return res.status(400).json({ message: "Creators cannot leave, delete the community instead" });
 
     const { count } = await prisma.communityMember.deleteMany({
       where: { communityId, userId: req.user.id },
@@ -426,7 +426,7 @@ export const updateCommunity = async (req, res) => {
 };
 
 // ── DELETE /api/communities/:id/members/:userId ───────────────
-// Kick a member — creator or admin only, cannot kick yourself
+// Kick a member 
 export const kickMember = async (req, res) => {
   try {
     const communityId  = parseInt(req.params.id);
@@ -456,10 +456,8 @@ export const kickMember = async (req, res) => {
 };
 
 // ── GET /api/communities/:id/feed ────────────────────────────
-// Unified community wall — merges recipe shares AND text posts
-// sorted chronologically. Each item has a `kind` field:
-//   kind: "recipe" — a shared recipe
-//   kind: "post"   — a text discussion post
+// Unified community wall, merges recipe shares AND text posts
+
 export const getCommunityFeed = async (req, res) => {
   try {
     const communityId = parseInt(req.params.id);

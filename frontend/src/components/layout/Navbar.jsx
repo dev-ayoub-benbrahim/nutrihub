@@ -96,7 +96,7 @@ export default function Navbar() {
             <input
               value={query}
               onChange={e => setQuery(e.target.value)}
-              placeholder="Search recipes, ingredients, cuisines..."
+              placeholder="Search recipes"
               className="bg-transparent border-none outline-none text-cream
                          text-sm font-sans w-full placeholder:text-muted"
             />

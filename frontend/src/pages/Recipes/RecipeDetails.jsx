@@ -5,7 +5,23 @@ import { useAuth } from '../../hooks/useAuth';
 import { formatCookTime, getInitials, getErrorMessage } from '../../utils/helpers';
 import toast from 'react-hot-toast';
 import Button from '../../components/ui/Button';
-import ReportModal from '../../components/ReportModal';
+import ReportModal from '../../components/reportmodal';
+import ConfirmModal from '../../components/ConfirmModal';
+
+// Unit → grams conversion (matches Recipe.controller.js)
+const UNIT_G = {
+  g:1, gram:1, grams:1,
+  kg:1000,
+  ml:1, milliliter:1, millilitre:1,
+  l:1000, liter:1000, litre:1000,
+  tsp:5, teaspoon:5,
+  tbsp:15, tablespoon:15,
+  cup:240,
+  oz:28.35, ounce:28.35,
+  lb:453.6, pound:453.6,
+  piece:100, slice:30, clove:6, pinch:0.3,
+};
+const toGrams = (qty, unit) => qty * (UNIT_G[(unit || 'g').toLowerCase()] ?? 1);
 
 export default function RecipeDetails() {
   const { id }       = useParams();
@@ -20,7 +36,8 @@ export default function RecipeDetails() {
   const [likeCount,setLikeCount]= useState(0);
   const [comment,  setComment]  = useState('');
   const [posting,  setPosting]  = useState(false);
-  const [showReport,    setShowReport]    = useState(false);
+  const [showReport,     setShowReport]    = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   const [expertNote,    setExpertNote]    = useState(null);
   const [relatedRecipes, setRelatedRecipes] = useState([]);
@@ -84,7 +101,6 @@ export default function RecipeDetails() {
   };
 
   const handleDelete = async () => {
-    if (!window.confirm('Delete this recipe? This cannot be undone.')) return;
     try {
       await api.delete(`/recipes/${id}`);
       toast.success('Recipe deleted');
@@ -268,7 +284,7 @@ export default function RecipeDetails() {
               Edit
             </button>
             <button
-              onClick={handleDelete}
+              onClick={() => setShowDeleteModal(true)}
               className="text-sm text-red-400 hover:text-red-300
                          border border-red-500/20 hover:border-red-400/40
                          px-3 py-2 rounded-xl transition-all duration-200"
@@ -297,18 +313,54 @@ export default function RecipeDetails() {
           </h2>
           {recipe.ingredients?.length > 0 ? (
             <ul className="space-y-2">
-              {recipe.ingredients.map(ri => (
-                <li key={ri.id}
-                    className="flex items-start justify-between py-2
-                               border-b border-[rgba(74,124,89,0.12)] last:border-0">
-                  <span className="text-[14px] text-cream capitalize">
-                    {ri.ingredient?.name || ri.name}
-                  </span>
-                  <span className="text-[13px] text-gold font-medium ml-3 flex-shrink-0">
-                    {ri.quantity % 1 === 0 ? ri.quantity : Number(ri.quantity).toFixed(1)} {ri.unit}
-                  </span>
-                </li>
-              ))}
+              {recipe.ingredients.map(ri => {
+                const hasUsda   = ri.isBuiltIn === true;
+                const hasManual = ri.manualCalories != null;
+                const grams     = toGrams(ri.quantity, ri.unit);
+                // For USDA ingredients, kcal is already summed at recipe level
+                // Show per-ingredient kcal from manual entry only
+                const ingKcal   = hasManual
+                  ? Math.round(ri.manualCalories * grams / 100)
+                  : null;
+                return (
+                  <li key={ri.id}
+                      className="flex items-start justify-between py-2
+                                 border-b border-[rgba(74,124,89,0.12)] last:border-0">
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <span className="w-1.5 h-1.5 rounded-full bg-sage flex-shrink-0 mt-1.5"/>
+                      <span className="text-[14px] text-cream capitalize">
+                        {ri.ingredient?.name || ri.name}
+                      </span>
+                      {hasUsda && (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-[rgba(74,124,89,0.15)]
+                                         text-sage border border-sage/20 flex-shrink-0">
+                          USDA
+                        </span>
+                      )}
+                      {hasManual && !hasUsda && (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-[rgba(212,168,67,0.12)]
+                                         text-gold border border-gold/20 flex-shrink-0">
+                          author estimate
+                        </span>
+                      )}
+                      {!hasUsda && !hasManual && (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-[rgba(100,100,100,0.12)]
+                                         text-muted border border-muted/20 flex-shrink-0">
+                          no data
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 ml-3 flex-shrink-0">
+                      {ingKcal != null && ingKcal > 0 && (
+                        <span className="text-[11px] text-gold/70">{ingKcal} kcal</span>
+                      )}
+                      <span className="text-[13px] text-gold font-medium">
+                        {ri.quantity % 1 === 0 ? ri.quantity : Number(ri.quantity).toFixed(1)} {ri.unit}
+                      </span>
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           ) : (
             <p className="text-muted text-sm">No ingredients listed</p>
@@ -323,10 +375,11 @@ export default function RecipeDetails() {
             {[
               // USDA-calculated from ingredients first, manual entry as fallback
               ...((() => {
-                const usdaCal  = recipe.ingredients?.reduce((s, i) => s + (i.ingredient?.caloriesPer100g ? i.ingredient.caloriesPer100g * i.quantity / 100 : 0), 0) || 0;
-                const usdaPro  = recipe.ingredients?.reduce((s, i) => s + (i.ingredient?.proteinPer100g  ? i.ingredient.proteinPer100g  * i.quantity / 100 : 0), 0) || 0;
-                const usdaCarb = recipe.ingredients?.reduce((s, i) => s + (i.ingredient?.carbsPer100g    ? i.ingredient.carbsPer100g    * i.quantity / 100 : 0), 0) || 0;
-                const usdaFat  = recipe.ingredients?.reduce((s, i) => s + (i.ingredient?.fatPer100g      ? i.ingredient.fatPer100g      * i.quantity / 100 : 0), 0) || 0;
+                // Backend already calculated macros correctly — use stored values directly
+                const usdaCal  = recipe.caloriesPerServing || 0;
+                const usdaPro  = recipe.proteinPerServing  || 0;
+                const usdaCarb = recipe.carbsPerServing    || 0;
+                const usdaFat  = recipe.fatPerServing      || 0;
                 const hasUsda  = usdaCal > 0 || usdaPro > 0;
                 return [
                   ['Calories',      hasUsda ? usdaCal.toFixed(0)  : recipe.caloriesPerServing?.toFixed(0), 'kcal'],
@@ -585,6 +638,16 @@ export default function RecipeDetails() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        onConfirm={handleDelete}
+        title="Delete recipe"
+        message={`"${recipe?.title || 'This recipe'}" will be permanently deleted. All likes, saves, and comments will also be removed.`}
+        confirmLabel="Delete recipe"
+        danger
+      />
 
       <ReportModal
         isOpen={showReport}

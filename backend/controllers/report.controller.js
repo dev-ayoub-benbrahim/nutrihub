@@ -36,7 +36,7 @@ export const createReport = async (req, res) => {
       },
     });
 
-    res.status(201).json({ message: "Report submitted — our team will review it" });
+    res.status(201).json({ message: "Report submitted, our team will review it" });
   } catch (error) {
     console.error("createReport error:", error);
     res.status(500).json({ message: "Server error" });
@@ -86,7 +86,7 @@ export const createExpertRequest = async (req, res) => {
       },
     });
 
-    res.status(201).json({ message: "Expert verification request submitted — we will review it within 48 hours" });
+    res.status(201).json({ message: "Expert verification request submitted, we will review it within 48 hours" });
   } catch (error) {
     console.error("createExpertRequest error:", error);
     res.status(500).json({ message: "Server error" });

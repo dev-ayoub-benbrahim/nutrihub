@@ -1,8 +1,6 @@
 """
-NutriHub AI Service — Nutrition Lookup
-=======================================
 Three-tier lookup strategy:
-  1. Built-in table  — ~80 common ingredients, USDA-sourced values, instant
+  1. Built-in table  — 80 common ingredients, USDA-sourced values, instant
   2. USDA API        — for ingredients not in the built-in table
   3. LLM estimate    — final fallback when both above fail
 
@@ -25,7 +23,7 @@ NUTRIENT_IDS = {
     "fat_g":     1004,
 }
 
-# ── Built-in nutrition table (per 100g) ──────────────────────────────────────
+# Built-in nutrition table (per 100g) 
 # Sourced from USDA SR Legacy / FoodData Central.
 # Keys are lowercase — searched by substring match.
 # Format: { "keyword": (calories, protein_g, carbs_g, fat_g) }
